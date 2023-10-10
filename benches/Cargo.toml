@@ -1,0 +1,30 @@
+[package]
+name = "unicode_normalization_example_benches"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+criterion = "0.5.1"
+icu_normalizer = "1.2.0"
+icu_testdata = "1.2.0"
+
+unicode_decomposing_v1 = { path = "./../decomposing/1_base" }
+unicode_decomposing_v2 = { path = "./../decomposing/2_opt" }
+
+[[bench]]
+name = "v1"
+path = "benches/v1.rs"
+harness = false
+
+[[bench]]
+name = "v2"
+path = "benches/v2.rs"
+harness = false
+
+[[bench]]
+name = "icu"
+path = "benches/icu.rs"
+harness = false
+
+[profile.bench]
+opt-level = 3

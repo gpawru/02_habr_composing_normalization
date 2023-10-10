@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "./source",
+    "./prepare",
+    "./composing/1_base",
+    "./composing/2_opt",
+    "./tests",
+]

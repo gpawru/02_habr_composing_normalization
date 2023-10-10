@@ -1,0 +1,17 @@
+[package]
+name = "unicode_composing_tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+icu_normalizer = "1.2.0"
+icu_testdata = "1.2.0"
+
+unicode_normalization_source = { path = "./../source" }
+
+unicode_composing_v1 = { path = "./../composing/1_base" }
+unicode_composing_v2 = { path = "./../composing/2_opt" }
+
+[profile.test]
+opt-level = 3
