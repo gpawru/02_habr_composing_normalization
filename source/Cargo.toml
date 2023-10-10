@@ -1,0 +1,8 @@
+[package]
+name = "unicode_normalization_source"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+lazy_static = "1.4.0"

@@ -1,0 +1,4 @@
+unstable_features = true
+max_width = 100
+brace_style = "AlwaysNextLine"
+spaces_around_ranges = true
