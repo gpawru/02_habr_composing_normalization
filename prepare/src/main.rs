@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 use crate::output::format::format_num_vec;
 use std::fs::File;
 

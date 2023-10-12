@@ -52,6 +52,7 @@ pub fn prepare<'a>(canonical: bool) -> (Vec<u32>, Vec<u64>, Vec<u32>, CodepointG
             let codepoint = unicode.get(&code);
 
             // если кодпоинт не найден - значит это стартер без декомпозиции
+            // стоит заметить, что если кодпоинт участвует в композиции, то он обязательно содержится в таблице
             if codepoint.is_none() {
                 block_data[offset as usize] = 0;
                 continue;

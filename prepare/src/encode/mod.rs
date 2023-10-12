@@ -1,6 +1,9 @@
 use unicode_normalization_source::{properties::*, UNICODE};
 
+use self::composition::COMPOSES_WITH_LEFT;
 use crate::output::stats::CodepointGroups;
+
+pub mod composition;
 
 /// стартер без декомпозиции
 pub const MARKER_STARTER: u64 = 0;
@@ -12,6 +15,9 @@ pub const MARKER_PAIR: u64 = 2;
 pub const MARKER_SINGLETON: u64 = 3;
 /// декомпозиция, вынесенная во внешний блок
 pub const MARKER_EXPANSION: u64 = 4;
+
+/// кодпоинт может быть скомбинирован с предыдущим
+pub const MARKER_COMPOSES_WITH_LEFT: u64 = 8;
 
 /// закодировать кодпоинт для таблицы данных
 pub fn encode_codepoint(
@@ -39,7 +45,15 @@ pub fn encode_codepoint(
         long_decomposition,       // декомпозиция > 3 символов
     ]
     .iter()
-    .find_map(|f| f(codepoint, decomposition, expansion_position, stats));
+    .find_map(|f| {
+        f(
+            codepoint,
+            decomposition,
+            composes_with_left(codepoint.code, decomposition),
+            expansion_position,
+            stats,
+        )
+    });
 
     match value {
         Some(value) => value,
@@ -68,15 +82,25 @@ pub fn encode_codepoint(
 fn starter(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     _: usize,
-    _: &mut CodepointGroups,
+    stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
     if !codepoint.ccc.is_starter() || !decomposition.is_empty() {
         return None;
     }
 
-    let value = MARKER_STARTER;
+    let value = MARKER_STARTER | compose_marker(composes_with_left);
+
+    if composes_with_left {
+        to_stats(
+            stats,
+            "0. стартеры (с возможной композицией с предыдущим кодпоинтом)",
+            codepoint,
+            decomposition,
+        );
+    }
 
     Some((value, vec![]))
 }
@@ -87,6 +111,7 @@ fn starter(
 fn nonstarter(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -97,9 +122,17 @@ fn nonstarter(
 
     let ccc = u64::from(codepoint.ccc);
 
-    let value = MARKER_NON_STARTER | (ccc << 8);
+    let value = MARKER_NON_STARTER | compose_marker(composes_with_left) | (ccc << 8);
 
-    to_stats(stats, "1. не-стартеры", codepoint, decomposition);
+    to_stats(
+        stats,
+        match composes_with_left {
+            true => "1.1 не-стартеры (с возможной композицией с предыдущим кодпоинтом)",
+            false => "1.2 не-стартеры (невозможна композиция с предыдущим кодпоинтом)",
+        },
+        codepoint,
+        decomposition,
+    );
     Some((value, vec![]))
 }
 
@@ -109,6 +142,7 @@ fn nonstarter(
 fn singleton(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -118,6 +152,10 @@ fn singleton(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!("синглтоны не комбинируются с предыдущими кодпоинтами");
     }
 
     let code = decomposition[0] as u64;
@@ -136,6 +174,7 @@ fn singleton(
 fn pair16(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -146,6 +185,10 @@ fn pair16(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!("пары: первые кодпоинты декомпозиции не комбинируются с предыдущими");
     }
 
     let c1 = decomposition[0] as u64;
@@ -166,6 +209,7 @@ fn pair16(
 fn triple16(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -176,6 +220,10 @@ fn triple16(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!("тройки: первые кодпоинты декомпозиции не комбинируются с предыдущими");
     }
 
     let c1 = decomposition[0] as u64;
@@ -199,6 +247,7 @@ fn triple16(
 fn pair18(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -209,6 +258,10 @@ fn pair18(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!("пары за пределами BMP: первые кодпоинты декомпозиции не комбинируются с предыдущими кодпоинтами");
     }
 
     let value = MARKER_EXPANSION
@@ -225,6 +278,7 @@ fn pair18(
 fn starter_to_nonstarters(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -237,10 +291,20 @@ fn starter_to_nonstarters(
     }
 
     let value = MARKER_EXPANSION
+        | compose_marker(composes_with_left)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
-    to_stats(stats, "6. стартеры в не-стартеры", codepoint, decomposition);
+    to_stats(
+        stats,
+        match composes_with_left {
+            true => "6.1 стартеры в не-стартеры (комбинируются)",
+            false => "6.2 стартеры в не-стартеры (не комбинируются)",
+        },
+        codepoint,
+        decomposition,
+    );
+
     Some((value, map_expansion(decomposition)))
 }
 
@@ -250,6 +314,7 @@ fn starter_to_nonstarters(
 fn nonstarter_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -259,12 +324,17 @@ fn nonstarter_decomposition(
     }
 
     let value = MARKER_EXPANSION
+        | compose_marker(composes_with_left)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
+    if !composes_with_left {
+        panic!("не-стартеры с декомпозицией: первый кодпоинт декомпозиции всегда может комбинироваться с предыдущим");
+    }
+
     to_stats(
         stats,
-        "7. не-стартеры с декомпозицией",
+        "7. не-стартеры с декомпозицией (комбинируются)",
         codepoint,
         decomposition,
     );
@@ -279,6 +349,7 @@ fn nonstarter_decomposition(
 fn triple18(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -289,6 +360,12 @@ fn triple18(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!(
+            "тройки (18 бит): первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
+        );
     }
 
     let value = MARKER_EXPANSION
@@ -306,6 +383,7 @@ fn triple18(
 fn long_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
+    composes_with_left: bool,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -315,6 +393,12 @@ fn long_decomposition(
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
+    }
+
+    if composes_with_left {
+        panic!(
+            "декомпозиция > 3 кодпоинтов: первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
+        );
     }
 
     let value = MARKER_EXPANSION
@@ -375,4 +459,24 @@ fn to_stats<'a>(
         .entry(group)
         .or_insert(vec![])
         .push(info(codepoint, decomposition));
+}
+
+/// кодпоинт (или его первый элемент декомпозиции, если она есть) может быть скомбинирован с предыдущим
+fn composes_with_left(code: u32, decomposition: &Vec<u32>) -> bool
+{
+    let code = match decomposition.is_empty() {
+        true => code,
+        false => decomposition[0],
+    };
+
+    COMPOSES_WITH_LEFT.contains(&code)
+}
+
+/// флаг комбинирования
+fn compose_marker(flag: bool) -> u64
+{
+    match flag {
+        true => MARKER_COMPOSES_WITH_LEFT,
+        false => 0,
+    }
 }
