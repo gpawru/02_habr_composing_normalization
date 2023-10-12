@@ -60,6 +60,15 @@ impl<'a> DecomposingNormalizer<'a>
             // у символа может быть декомпозиция: стартеры пишем в результат, не-стартеры - в буфер,
             // если после не-стартера встречаем стартер - сортируем не-стартеры, записываем, сбрасываем буфер
 
+            // в случае композиции:
+            //
+            // 1. стартер без декомпозиции может быть комбинируемым первым
+            // 2. стартер без декомпозиции может быть комбинируемым последним
+            // 3. оба стартера, слева и справа - некомбинируемые
+            //
+            //
+            //
+
             match self.decompose(code) {
                 DecompositionValue::None => {
                     flush!(result, buffer);
@@ -67,6 +76,7 @@ impl<'a> DecomposingNormalizer<'a>
                 }
                 DecompositionValue::NonStarter(ccc) => buffer.push(Codepoint { code, ccc }),
                 DecompositionValue::Pair(c1, c2) => {
+                    panic!("PAIR");
                     flush!(result, buffer);
                     write!(result, c1);
 
@@ -76,6 +86,7 @@ impl<'a> DecomposingNormalizer<'a>
                     }
                 }
                 DecompositionValue::Triple(c1, c2, c3) => {
+                    panic!("TRIPLE");
                     flush!(result, buffer);
                     write!(result, c1);
 
@@ -90,18 +101,22 @@ impl<'a> DecomposingNormalizer<'a>
                     }
                 }
                 DecompositionValue::Singleton(c1) => {
+                    panic!("SINGLETON");
                     flush!(result, buffer);
                     write!(result, c1);
                 }
                 DecompositionValue::HangulPair(c1, c2) => {
+                    panic!("HANGUL");
                     flush!(result, buffer);
                     write!(result, c1, c2);
                 }
                 DecompositionValue::HangulTriple(c1, c2, c3) => {
+                    panic!("HANGUL");
                     flush!(result, buffer);
                     write!(result, c1, c2, c3);
                 }
                 DecompositionValue::Expansion(index, count) => {
+                    panic!("EXPANSION");
                     for entry in
                         &self.expansions[(index as usize) .. (index as usize + count as usize)]
                     {

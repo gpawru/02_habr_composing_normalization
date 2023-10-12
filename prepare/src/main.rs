@@ -3,21 +3,21 @@ use std::fs::File;
 
 mod encode;
 mod output;
-mod tables;
 mod pairs;
+mod tables;
 
 fn main()
 {
-    pairs::nfc();
-    
-    // output::write(
-    //     true,
-    //     &mut File::create("./../data/nfd.rs.txt").unwrap(),
-    //     &mut File::create("./../data/nfd.stats.txt").unwrap(),
-    // );
-    // output::write(
-    //     false,
-    //     &mut File::create("./../data/nfkd.rs.txt").unwrap(),
-    //     &mut File::create("./../data/nfkd.stats.txt").unwrap(),
-    // );
+    // pairs::nfc();
+
+    output::write(
+        true,
+        &mut File::create("./../data/nfc.rs.txt").unwrap(),
+        &mut File::create("./../data/nfc.stats.txt").unwrap(),
+    );
+    output::write(
+        false,
+        &mut File::create("./../data/nfkc.rs.txt").unwrap(),
+        &mut File::create("./../data/nfkc.stats.txt").unwrap(),
+    );
 }
