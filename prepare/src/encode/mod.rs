@@ -1,7 +1,7 @@
 use unicode_normalization_source::{properties::*, UNICODE};
 
 use self::composition::COMPOSES_WITH_LEFT;
-use crate::output::stats::CodepointGroups;
+use crate::{encode::composition::COMPOSITIONS, output::stats::CodepointGroups};
 
 pub mod composition;
 
@@ -28,28 +28,31 @@ pub fn encode_codepoint(
 ) -> (u64, Vec<u32>)
 {
     let decomposition = match canonical {
-        true => &codepoint.canonical_decomposition,
-        false => &codepoint.compat_decomposition,
+        true => codepoint.canonical_decomposition.clone(),
+        false => codepoint.compat_decomposition.clone(),
     };
 
+    let decomposition = precompose(codepoint, decomposition);
+
     let value = [
-        starter,                  // стартер
-        nonstarter,               // не-стартер
-        singleton,                // синглтон
-        pair16,                   // пара (16 бит)
-        triple16,                 // тройка (16 бит)
-        pair18,                   // пара (18 бит)
-        starter_to_nonstarters,   // стартер в не-стартеры
-        nonstarter_decomposition, // не-стартер с декомпозицией в стартер
-        triple18,                 // тройка (18 бит)
-        long_decomposition,       // декомпозиция > 3 символов
+        starter,                    // стартер
+        starter_with_decomposition, // стартер, игнорируем декомпозицию
+        nonstarter,                 // не-стартер
+        singleton,                  // синглтон
+        pair16,                     // пара (16 бит)
+        triple16,                   // тройка (16 бит)
+        pair18,                     // пара (18 бит)
+        starter_to_nonstarters,     // стартер в не-стартеры
+        nonstarter_decomposition,   // не-стартер с декомпозицией в стартер
+        triple18,                   // тройка (18 бит)
+        long_decomposition,         // декомпозиция > 3 символов
     ]
     .iter()
     .find_map(|f| {
         f(
             codepoint,
-            decomposition,
-            composes_with_left(codepoint.code, decomposition),
+            &decomposition,
+            self::composes_with_left(codepoint.code, &decomposition),
             expansion_position,
             stats,
         )
@@ -105,6 +108,44 @@ fn starter(
     Some((value, vec![]))
 }
 
+/// стартер:
+///     - CCC = 0
+///     - декомпозиция из нескольких элементов
+///     - первый кодпоинт декомпозиции не может комбинироваться с предыдущим
+///     - все элементы - стартеры
+fn starter_with_decomposition(
+    codepoint: &Codepoint,
+    decomposition: &Vec<u32>,
+    composes_with_left: bool,
+    _: usize,
+    stats: &mut CodepointGroups,
+) -> Option<(u64, Vec<u32>)>
+{
+    if !codepoint.ccc.is_starter()
+        || decomposition.len() < 2
+        || composes_with_left
+        || decomposition.iter().any(|c| get_ccc(*c).is_non_starter())
+    {
+        return None;
+    }
+
+    assert!(
+        !self::composes_with_left(codepoint.code, &vec![]),
+        "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
+    );
+
+    let value = MARKER_STARTER;
+
+    to_stats(
+        stats,
+        "0. стартер с декомпозицией из стартеров",
+        codepoint,
+        decomposition,
+    );
+
+    Some((value, vec![]))
+}
+
 /// не-стартер:
 ///     - ССС > 0
 ///     - нет декомпозиции
@@ -154,9 +195,10 @@ fn singleton(
         return None;
     }
 
-    if composes_with_left {
-        panic!("синглтоны не комбинируются с предыдущими кодпоинтами");
-    }
+    assert!(
+        !composes_with_left,
+        "синглтоны не комбинируются с предыдущими кодпоинтами"
+    );
 
     let code = decomposition[0] as u64;
 
@@ -171,6 +213,7 @@ fn singleton(
 ///     - декомпозиция из 2х кодпоинтов
 ///     - кодпоинты декомпозиции - 16-битные
 ///     - первый из них - стартер
+///     - второй - не-стартер
 fn pair16(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
@@ -187,9 +230,16 @@ fn pair16(
         return None;
     }
 
-    if composes_with_left {
-        panic!("пары: первые кодпоинты декомпозиции не комбинируются с предыдущими");
-    }
+    assert!(
+        !composes_with_left,
+        "пары: первые кодпоинты декомпозиции не комбинируются с предыдущими"
+    );
+
+    // здесь должна быть именно ошибка, а не пропуск варианта, чтобы убедиться, что мы правильно понимаем суть распределения
+    assert!(
+        get_ccc(decomposition[1]).is_non_starter(),
+        "после предварительного комбинирования пар из стартеров в этот вариант попадает только пара стартер + не-стартер"
+    );
 
     let c1 = decomposition[0] as u64;
     let c2 = decomposition[1] as u64;
@@ -222,9 +272,10 @@ fn triple16(
         return None;
     }
 
-    if composes_with_left {
-        panic!("тройки: первые кодпоинты декомпозиции не комбинируются с предыдущими");
-    }
+    assert!(
+        !composes_with_left,
+        "тройки: первые кодпоинты декомпозиции не комбинируются с предыдущими"
+    );
 
     let c1 = decomposition[0] as u64;
     let c2 = decomposition[1] as u64;
@@ -260,9 +311,10 @@ fn pair18(
         return None;
     }
 
-    if composes_with_left {
-        panic!("пары за пределами BMP: первые кодпоинты декомпозиции не комбинируются с предыдущими кодпоинтами");
-    }
+    assert!(
+        !composes_with_left,
+        "пары за пределами BMP: первые кодпоинты декомпозиции не комбинируются с предыдущими кодпоинтами"
+    );
 
     let value = MARKER_EXPANSION
         | ((decomposition.len() as u64) << 8)
@@ -328,9 +380,10 @@ fn nonstarter_decomposition(
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
-    if !composes_with_left {
-        panic!("не-стартеры с декомпозицией: первый кодпоинт декомпозиции всегда может комбинироваться с предыдущим");
-    }
+    assert!(
+        composes_with_left,
+        "не-стартеры с декомпозицией: первый кодпоинт декомпозиции всегда может комбинироваться с предыдущим"
+    );
 
     to_stats(
         stats,
@@ -362,11 +415,10 @@ fn triple18(
         return None;
     }
 
-    if composes_with_left {
-        panic!(
-            "тройки (18 бит): первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
-        );
-    }
+    assert!(
+        !composes_with_left,
+        "тройки (18 бит): первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
+    );
 
     let value = MARKER_EXPANSION
         | ((decomposition.len() as u64) << 8)
@@ -395,11 +447,10 @@ fn long_decomposition(
         return None;
     }
 
-    if composes_with_left {
-        panic!(
-            "декомпозиция > 3 кодпоинтов: первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
-        );
-    }
+    assert!(
+        !composes_with_left,
+        "декомпозиция > 3 кодпоинтов: первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
+    );
 
     let value = MARKER_EXPANSION
         | ((decomposition.len() as u64) << 8)
@@ -479,4 +530,53 @@ fn compose_marker(flag: bool) -> u64
         true => MARKER_COMPOSES_WITH_LEFT,
         false => 0,
     }
+}
+
+/// скомбинировать декомпозицию, если:
+///     - первый кодпоинт декомпозиции не может быть скомбинирован с предыдущим,
+///     - декомпозиция начинается и заканчивается стартерами
+fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
+{
+    let composes_with_left = self::composes_with_left(codepoint.code, &decomposition);
+
+    if !codepoint.ccc.is_starter()
+        || decomposition.len() < 2
+        || composes_with_left
+        || decomposition.iter().any(|c| get_ccc(*c).is_non_starter())
+    {
+        return decomposition;
+    }
+
+    assert!(
+        !self::composes_with_left(codepoint.code, &vec![]),
+        "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
+    );
+
+    // собираем кодпоинт
+
+    let mut decomposition = decomposition;
+    let mut tail = Vec::new();
+
+    loop {
+        let first = *decomposition.first().unwrap();
+
+        if decomposition.len() <= 1 {
+            tail.push(decomposition[0]);
+            break;
+        };
+
+        let last = decomposition.pop().unwrap();
+        let key = &((first as u64) << 32 | last as u64);
+
+        if !COMPOSITIONS.contains_key(key) {
+            tail.push(last);
+            continue;
+        }
+
+        decomposition[0] = *COMPOSITIONS.get(key).unwrap();
+    }
+
+    tail.reverse();
+
+    tail
 }
