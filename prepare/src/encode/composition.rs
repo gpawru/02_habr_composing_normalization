@@ -5,12 +5,24 @@ use unicode_normalization_source::UNICODE;
 lazy_static! {
     /// комбинируемые кодпоинты
     pub static ref COMPOSES_WITH_LEFT: Vec<u32> = composes_with_left();
+    pub static ref COMPOSES_WITH_RIGHT: Vec<u32> = composes_with_right();
     /// пары
     pub static ref COMPOSITIONS: HashMap<(u32, u32), u32> = compositions();
 }
 
 /// может ли быть скомбинирован с каким-либо предстоящим кодпоинтом?
 fn composes_with_left() -> Vec<u32>
+{
+    composes(1)
+}
+
+// может ли быть скомбинирован с каким-либо следующим кодпоинтом?
+fn composes_with_right() -> Vec<u32>
+{
+    composes(0)
+}
+
+fn composes(i: usize) -> Vec<u32>
 {
     let mut map = Vec::new();
 
@@ -20,7 +32,7 @@ fn composes_with_left() -> Vec<u32>
             continue;
         }
 
-        map.push(entry.decomposition[1]);
+        map.push(entry.decomposition[i]);
     }
 
     map

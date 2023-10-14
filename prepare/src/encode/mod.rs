@@ -1,6 +1,6 @@
 use unicode_normalization_source::{properties::*, UNICODE};
 
-use self::composition::COMPOSES_WITH_LEFT;
+use self::composition::{COMPOSES_WITH_LEFT, COMPOSES_WITH_RIGHT};
 use crate::{encode::composition::COMPOSITIONS, output::stats::CodepointGroups};
 
 pub mod composition;
@@ -31,6 +31,10 @@ pub fn encode_codepoint(
         true => codepoint.canonical_decomposition.clone(),
         false => codepoint.compat_decomposition.clone(),
     };
+
+    // почему бы просто не взять декомпозицию из UCD? зачем делать декомпозицию, а потом композицию?
+    // ответ - например, мы сталкиваемся с U+01D5, который раскладывается на стартер U+0055 и два не-стартера.
+    // в UCD - на стартер U+00DC и не-стартер
 
     let decomposition = precompose(codepoint, decomposition);
 
@@ -134,7 +138,7 @@ fn starter_with_decomposition(
         "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
     );
 
-    let value = MARKER_STARTER;
+    let value = MARKER_STARTER + 9;
 
     to_stats(
         stats,
@@ -197,7 +201,8 @@ fn singleton(
 
     assert!(
         !composes_with_left,
-        "синглтоны не комбинируются с предыдущими кодпоинтами"
+        "{:04X} синглтоны не комбинируются с предыдущими кодпоинтами",
+        codepoint.code
     );
 
     let code = decomposition[0] as u64;
@@ -535,20 +540,28 @@ fn compose_marker(flag: bool) -> u64
 /// скомбинировать декомпозицию, если:
 ///     - декомпозиция начинается со стартера
 ///     - первый кодпоинт декомпозиции не может быть скомбинирован с любым предыдущим кодпоинтом
-///     - последний стартер декомпозиции не может быть скомбинирован с любыми следующими кодпоинтами
+/// не комбинируем не-стартеры в конце декомпозиции
 fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
 {
     let composes_with_left = self::composes_with_left(codepoint.code, &decomposition);
-    // let composes_with_right =
 
-    if !codepoint.ccc.is_starter()
-        || decomposition.len() < 2
-        || composes_with_left
-        || get_ccc(*decomposition.last().unwrap()).is_non_starter()
-    // TODO
-    {
+    if !codepoint.ccc.is_starter() || decomposition.len() < 2 || composes_with_left {
         return decomposition;
     }
+
+    let mut trailing_nonstarters = vec![];
+    let mut pending = decomposition;
+
+    while let Some(next) = pending.pop() {
+        if get_ccc(next).is_starter() {
+            pending.push(next);
+            break;
+        }
+        trailing_nonstarters.push(next);
+    }
+
+    trailing_nonstarters.reverse();
+    pending.reverse();
 
     assert!(
         !self::composes_with_left(codepoint.code, &vec![]),
@@ -556,8 +569,6 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
     );
 
     let mut composed: Vec<u32> = Vec::new();
-    let mut pending = decomposition;
-    pending.reverse();
 
     while !pending.is_empty() {
         // получим отрезок для композиции
@@ -596,6 +607,7 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
         composed.append(&mut tail);
     }
 
+    composed.append(&mut trailing_nonstarters);
     composed
 
     // U+3325
