@@ -533,16 +533,19 @@ fn compose_marker(flag: bool) -> u64
 }
 
 /// скомбинировать декомпозицию, если:
-///     - первый кодпоинт декомпозиции не может быть скомбинирован с предыдущим,
-///     - декомпозиция начинается и заканчивается стартерами
+///     - декомпозиция начинается со стартера
+///     - первый кодпоинт декомпозиции не может быть скомбинирован с любым предыдущим кодпоинтом
+///     - последний стартер декомпозиции не может быть скомбинирован с любыми следующими кодпоинтами
 fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
 {
     let composes_with_left = self::composes_with_left(codepoint.code, &decomposition);
+    // let composes_with_right =
 
     if !codepoint.ccc.is_starter()
         || decomposition.len() < 2
         || composes_with_left
-        || decomposition.iter().any(|c| get_ccc(*c).is_non_starter())
+        || get_ccc(*decomposition.last().unwrap()).is_non_starter()
+    // TODO
     {
         return decomposition;
     }
@@ -552,31 +555,48 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
         "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
     );
 
-    // собираем кодпоинт
+    let mut composed: Vec<u32> = Vec::new();
+    let mut pending = decomposition;
+    pending.reverse();
 
-    let mut decomposition = decomposition;
-    let mut tail = Vec::new();
+    while !pending.is_empty() {
+        // получим отрезок для композиции
 
-    loop {
-        let first = *decomposition.first().unwrap();
+        let mut first = match composed.last() {
+            Some(c) if get_ccc(*c).is_starter() => composed.pop(),
+            _ => pending.pop(),
+        }
+        .unwrap();
 
-        if decomposition.len() <= 1 {
-            tail.push(decomposition[0]);
-            break;
-        };
+        let mut slice = vec![];
 
-        let last = decomposition.pop().unwrap();
-        let key = &((first as u64) << 32 | last as u64);
+        while let Some(next) = pending.pop() {
+            slice.push(next);
 
-        if !COMPOSITIONS.contains_key(key) {
-            tail.push(last);
-            continue;
+            if get_ccc(next).is_starter() {
+                break;
+            }
         }
 
-        decomposition[0] = *COMPOSITIONS.get(key).unwrap();
+        // комбинируем
+
+        let mut tail = vec![];
+
+        while let Some(next) = slice.pop() {
+            match COMPOSITIONS.get(&(first, next)) {
+                Some(code) => {
+                    first = *code;
+                }
+                None => tail.push(next),
+            }
+        }
+        tail.reverse();
+
+        composed.push(first);
+        composed.append(&mut tail);
     }
 
-    tail.reverse();
+    composed
 
-    tail
+    // U+3325
 }

@@ -6,7 +6,7 @@ lazy_static! {
     /// комбинируемые кодпоинты
     pub static ref COMPOSES_WITH_LEFT: Vec<u32> = composes_with_left();
     /// пары
-    pub static ref COMPOSITIONS: HashMap<u64, u32> = compositions();
+    pub static ref COMPOSITIONS: HashMap<(u32, u32), u32> = compositions();
 }
 
 /// может ли быть скомбинирован с каким-либо предстоящим кодпоинтом?
@@ -27,13 +27,13 @@ fn composes_with_left() -> Vec<u32>
 }
 
 /// каноническая композиция
-fn compositions() -> HashMap<u64, u32>
+fn compositions() -> HashMap<(u32, u32), u32>
 {
     let mut map = HashMap::new();
 
     for entry in UNICODE.values() {
         if entry.decomposition.len() == 2 && entry.decomposition_tag.is_none() {
-            let key = (entry.decomposition[0] as u64) << 32 | entry.decomposition[1] as u64;
+            let key = (entry.decomposition[0], entry.decomposition[1]);
 
             map.insert(key, entry.code);
         }

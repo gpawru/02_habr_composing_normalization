@@ -1,7 +1,3 @@
-0. стартер с декомпозицией из стартеров
-
-U+0CCB - KANNADA VOWEL SIGN OO [0] (2) [0] [0] 
- 
 0. стартеры (с возможной композицией с предыдущим кодпоинтом)
 
 U+09BE - BENGALI VOWEL SIGN AA [0] (0) 
@@ -973,6 +969,7 @@ U+0CC0 - KANNADA VOWEL SIGN II [0] (1) [0]
 U+0CC7 - KANNADA VOWEL SIGN EE [0] (1) [0] 
 U+0CC8 - KANNADA VOWEL SIGN AI [0] (1) [0] 
 U+0CCA - KANNADA VOWEL SIGN O [0] (1) [0] 
+U+0CCB - KANNADA VOWEL SIGN OO [0] (1) [0] 
 U+0D4A - MALAYALAM VOWEL SIGN O [0] (1) [0] 
 U+0D4B - MALAYALAM VOWEL SIGN OO [0] (1) [0] 
 U+0D4C - MALAYALAM VOWEL SIGN AU [0] (1) [0] 
