@@ -1,6 +1,6 @@
 use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
 
-use unicode_composing_v1::DecomposingNormalizer as v1;
+use unicode_composing_v1::ComposingNormalizer as v1;
 // use unicode_composing_v2::DecomposingNormalizer as v2;
 
 macro_rules! test {
@@ -40,7 +40,7 @@ fn ucd_test_nfc()
         };
     }
 
-    test_group!(v1::nfd() /*, v2::nfc() */);
+    test_group!(v1::nfc() /*, v2::nfc() */);
 }
 
 // /// тесты NFKC нормализации из UCD

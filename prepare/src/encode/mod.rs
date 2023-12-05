@@ -1,7 +1,13 @@
 use unicode_normalization_source::{properties::*, UNICODE};
 
-use self::composition::{COMPOSES_WITH_LEFT, COMPOSES_WITH_RIGHT};
-use crate::{encode::composition::COMPOSITIONS, output::stats::CodepointGroups};
+use crate::{
+    encode::composition::{
+        COMBINES_BACKWARDS, COMBINES_FORWARDS, COMPOSITION_PAIRS, COMPOSITION_REFS,
+    },
+    output::stats::CodepointGroups,
+};
+
+use self::composition::CompositionInfo;
 
 pub mod composition;
 
@@ -17,7 +23,7 @@ pub const MARKER_SINGLETON: u64 = 3;
 pub const MARKER_EXPANSION: u64 = 4;
 
 /// кодпоинт может быть скомбинирован с предыдущим
-pub const MARKER_COMPOSES_WITH_LEFT: u64 = 8;
+pub const MARKER_COMBINES_BACKWARDS: u64 = 8;
 
 /// закодировать кодпоинт для таблицы данных
 pub fn encode_codepoint(
@@ -56,7 +62,8 @@ pub fn encode_codepoint(
         f(
             codepoint,
             &decomposition,
-            self::composes_with_left(codepoint.code, &decomposition),
+            self::combines_backwards(codepoint.code, &decomposition),
+            self::last_starter_combines_forwards(codepoint.code, &decomposition),
             expansion_position,
             stats,
         )
@@ -89,7 +96,8 @@ pub fn encode_codepoint(
 fn starter(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -98,9 +106,16 @@ fn starter(
         return None;
     }
 
-    let value = MARKER_STARTER | compose_marker(composes_with_left);
+    let compose_info = match combines_forwards {
+        Some(position) => {
+            assert_eq!(position, 0);
 
-    if composes_with_left {
+            (COMPOSITION_REFS.get(&codepoint.code).unwrap().bake() as u64) << 16
+        }
+        None => 0,
+    };
+
+    if combines_backwards {
         to_stats(
             stats,
             "0. стартеры (с возможной композицией с предыдущим кодпоинтом)",
@@ -108,6 +123,8 @@ fn starter(
             decomposition,
         );
     }
+
+    let value = MARKER_STARTER | compose_marker(combines_backwards) | compose_info;
 
     Some((value, vec![]))
 }
@@ -120,21 +137,22 @@ fn starter(
 fn starter_with_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
     if !codepoint.ccc.is_starter()
         || decomposition.len() < 2
-        || composes_with_left
+        || combines_backwards
         || decomposition.iter().any(|c| get_ccc(*c).is_non_starter())
     {
         return None;
     }
 
     assert!(
-        !self::composes_with_left(codepoint.code, &vec![]),
+        !self::combines_backwards(codepoint.code, &vec![]),
         "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
     );
 
@@ -156,7 +174,8 @@ fn starter_with_decomposition(
 fn nonstarter(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -167,11 +186,11 @@ fn nonstarter(
 
     let ccc = u64::from(codepoint.ccc);
 
-    let value = MARKER_NON_STARTER | compose_marker(composes_with_left) | (ccc << 8);
+    let value = MARKER_NON_STARTER | compose_marker(combines_backwards) | (ccc << 8);
 
     to_stats(
         stats,
-        match composes_with_left {
+        match combines_backwards {
             true => "1.1 не-стартеры (с возможной композицией с предыдущим кодпоинтом)",
             false => "1.2 не-стартеры (невозможна композиция с предыдущим кодпоинтом)",
         },
@@ -187,7 +206,8 @@ fn nonstarter(
 fn singleton(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -200,14 +220,23 @@ fn singleton(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "{:04X} синглтоны не комбинируются с предыдущими кодпоинтами",
         codepoint.code
     );
 
     let code = decomposition[0] as u64;
 
-    let value = MARKER_SINGLETON | (code << 32);
+    let compose_info = match combines_forwards {
+        Some(position) => {
+            assert_eq!(position, 0);
+
+            (COMPOSITION_REFS.get(&(code as u32)).unwrap().bake() as u64) << 16
+        }
+        None => 0,
+    };
+
+    let value = MARKER_SINGLETON | compose_info | (code << 32);
 
     to_stats(stats, "2. синглтоны", codepoint, decomposition);
     Some((value, vec![]))
@@ -222,7 +251,8 @@ fn singleton(
 fn pair16(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -236,7 +266,7 @@ fn pair16(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "пары: первые кодпоинты декомпозиции не комбинируются с предыдущими"
     );
 
@@ -250,7 +280,16 @@ fn pair16(
     let c2 = decomposition[1] as u64;
     let c2_ccc = u64::from(get_ccc(decomposition[1]));
 
-    let value = MARKER_PAIR | (c2_ccc << 8) | (c1 << 16) | (c2 << 32);
+    let compose_info = match combines_forwards {
+        Some(position) => {
+            assert_eq!(position, 0);
+
+            (COMPOSITION_REFS.get(&(c1 as u32)).unwrap().bake() as u64) << 48
+        }
+        None => 0,
+    };
+
+    let value = MARKER_PAIR | (c2_ccc << 8) | (c1 << 16) | (c2 << 32) | compose_info;
 
     to_stats(stats, "3. пары (16 бит)", codepoint, decomposition);
     Some((value, vec![]))
@@ -264,7 +303,8 @@ fn pair16(
 fn triple16(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -278,7 +318,7 @@ fn triple16(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "тройки: первые кодпоинты декомпозиции не комбинируются с предыдущими"
     );
 
@@ -303,7 +343,8 @@ fn triple16(
 fn pair18(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -317,7 +358,7 @@ fn pair18(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "пары за пределами BMP: первые кодпоинты декомпозиции не комбинируются с предыдущими кодпоинтами"
     );
 
@@ -335,7 +376,8 @@ fn pair18(
 fn starter_to_nonstarters(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -348,13 +390,13 @@ fn starter_to_nonstarters(
     }
 
     let value = MARKER_EXPANSION
-        | compose_marker(composes_with_left)
+        | compose_marker(combines_backwards)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
     to_stats(
         stats,
-        match composes_with_left {
+        match combines_backwards {
             true => "6.1 стартеры в не-стартеры (комбинируются)",
             false => "6.2 стартеры в не-стартеры (не комбинируются)",
         },
@@ -371,7 +413,8 @@ fn starter_to_nonstarters(
 fn nonstarter_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -381,12 +424,12 @@ fn nonstarter_decomposition(
     }
 
     let value = MARKER_EXPANSION
-        | compose_marker(composes_with_left)
+        | compose_marker(combines_backwards)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
     assert!(
-        composes_with_left,
+        combines_backwards,
         "не-стартеры с декомпозицией: первый кодпоинт декомпозиции всегда может комбинироваться с предыдущим"
     );
 
@@ -407,7 +450,8 @@ fn nonstarter_decomposition(
 fn triple18(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -421,7 +465,7 @@ fn triple18(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "тройки (18 бит): первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
     );
 
@@ -440,7 +484,8 @@ fn triple18(
 fn long_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
-    composes_with_left: bool,
+    combines_backwards: bool,
+    combines_forwards: Option<u8>,
     expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
@@ -453,7 +498,7 @@ fn long_decomposition(
     }
 
     assert!(
-        !composes_with_left,
+        !combines_backwards,
         "декомпозиция > 3 кодпоинтов: первый кодпоинт декомпозиции не может комбинироваться с предыдущим"
     );
 
@@ -518,21 +563,46 @@ fn to_stats<'a>(
 }
 
 /// кодпоинт (или его первый элемент декомпозиции, если она есть) может быть скомбинирован с предыдущим
-fn composes_with_left(code: u32, decomposition: &Vec<u32>) -> bool
+fn combines_backwards(code: u32, decomposition: &Vec<u32>) -> bool
 {
     let code = match decomposition.is_empty() {
         true => code,
         false => decomposition[0],
     };
 
-    COMPOSES_WITH_LEFT.contains(&code)
+    COMBINES_BACKWARDS.contains(&code)
+}
+
+/// кодпоинт (или его последний стартер) может быть скомбинирован с последующими
+pub fn last_starter_combines_forwards(code: u32, decomposition: &Vec<u32>) -> Option<u8>
+{
+    if decomposition.is_empty() {
+        return match get_ccc(code).is_starter() && COMBINES_FORWARDS.contains(&code) {
+            true => Some(0),
+            false => None,
+        };
+    }
+
+    for i in (0 .. decomposition.len()).rev() {
+        let code = decomposition[i];
+
+        if get_ccc(code).is_non_starter() {
+            continue;
+        };
+
+        if COMBINES_FORWARDS.contains(&code) {
+            return Some(i as u8);
+        }
+    }
+
+    None
 }
 
 /// флаг комбинирования
 fn compose_marker(flag: bool) -> u64
 {
     match flag {
-        true => MARKER_COMPOSES_WITH_LEFT,
+        true => MARKER_COMBINES_BACKWARDS,
         false => 0,
     }
 }
@@ -543,9 +613,9 @@ fn compose_marker(flag: bool) -> u64
 /// не комбинируем не-стартеры в конце декомпозиции
 fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
 {
-    let composes_with_left = self::composes_with_left(codepoint.code, &decomposition);
+    let combines_backwards = self::combines_backwards(codepoint.code, &decomposition);
 
-    if !codepoint.ccc.is_starter() || decomposition.len() < 2 || composes_with_left {
+    if !codepoint.ccc.is_starter() || decomposition.len() < 2 || combines_backwards {
         return decomposition;
     }
 
@@ -564,7 +634,7 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
     pending.reverse();
 
     assert!(
-        !self::composes_with_left(codepoint.code, &vec![]),
+        !self::combines_backwards(codepoint.code, &vec![]),
         "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
     );
 
@@ -594,10 +664,13 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
         let mut tail = vec![];
 
         while let Some(next) = slice.pop() {
-            match COMPOSITIONS.get(&(first, next)) {
-                Some(code) => {
-                    first = *code;
-                }
+            match COMPOSITION_PAIRS.get(&first) {
+                Some(pair) => match pair.get(&next) {
+                    Some(code) => {
+                        first = *code;
+                    }
+                    None => tail.push(next),
+                },
                 None => tail.push(next),
             }
         }
@@ -609,6 +682,4 @@ fn precompose(codepoint: &Codepoint, decomposition: Vec<u32>) -> Vec<u32>
 
     composed.append(&mut trailing_nonstarters);
     composed
-
-    // U+3325
 }

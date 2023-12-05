@@ -2,27 +2,31 @@ use std::collections::HashMap;
 
 use unicode_normalization_source::UNICODE;
 
+use crate::tables::compositions::compositions;
+
 lazy_static! {
     /// комбинируемые кодпоинты
-    pub static ref COMPOSES_WITH_LEFT: Vec<u32> = composes_with_left();
-    pub static ref COMPOSES_WITH_RIGHT: Vec<u32> = composes_with_right();
+    pub static ref COMBINES_BACKWARDS: Vec<u32> = combines_backwards();
+    pub static ref COMBINES_FORWARDS: Vec<u32> = combines_forwards();
     /// пары
-    pub static ref COMPOSITIONS: HashMap<(u32, u32), u32> = compositions();
+    pub static ref COMPOSITION_PAIRS: HashMap<u32, HashMap<u32, u32>> = pairs();
+    pub static ref COMPOSITION_REFS: HashMap<u32, CompositionInfo> = composition_refs();
 }
 
 /// может ли быть скомбинирован с каким-либо предстоящим кодпоинтом?
-fn composes_with_left() -> Vec<u32>
+fn combines_backwards() -> Vec<u32>
 {
-    composes(1)
+    combines(1)
 }
 
-// может ли быть скомбинирован с каким-либо следующим кодпоинтом?
-fn composes_with_right() -> Vec<u32>
+/// может ли быть скомбинирован с каким-либо следующим кодпоинтом?
+fn combines_forwards() -> Vec<u32>
 {
-    composes(0)
+    combines(0)
 }
 
-fn composes(i: usize) -> Vec<u32>
+/// может ли кодпоинт быть скомбинирован?
+fn combines(i: usize) -> Vec<u32>
 {
     let mut map = Vec::new();
 
@@ -38,18 +42,56 @@ fn composes(i: usize) -> Vec<u32>
     map
 }
 
-/// каноническая композиция
-fn compositions() -> HashMap<(u32, u32), u32>
+/// хешмап пар для композиции
+fn pairs() -> HashMap<u32, HashMap<u32, u32>>
 {
-    let mut map = HashMap::new();
+    let mut map: HashMap<u32, HashMap<u32, u32>> = HashMap::new();
 
-    for entry in UNICODE.values() {
-        if entry.decomposition.len() == 2 && entry.decomposition_tag.is_none() {
-            let key = (entry.decomposition[0], entry.decomposition[1]);
-
-            map.insert(key, entry.code);
+    for codepoint in UNICODE.values() {
+        if codepoint.decomposition.len() != 2 || codepoint.decomposition_tag.is_some() {
+            continue;
         }
+
+        let c0 = codepoint.decomposition[0];
+        let c1 = codepoint.decomposition[1];
+
+        map.entry(c0)
+            .and_modify(|c| {
+                c.insert(c1, codepoint.code);
+            })
+            .or_insert({
+                let mut c = HashMap::new();
+                c.insert(c1, codepoint.code);
+                c
+            });
     }
 
     map
+}
+
+fn composition_refs() -> HashMap<u32, CompositionInfo>
+{
+    let (_, refs) = compositions();
+    refs
+}
+
+/// информация о хранимых композициях для стартера
+#[derive(Default)]
+pub struct CompositionInfo
+{
+    /// индекс первого элемента в таблице композиций
+    pub index: u16,
+    /// количество композиций для стартера
+    pub count: u8,
+}
+
+impl CompositionInfo
+{
+    pub fn bake(&self) -> u16
+    {
+        assert!(self.index <= 0x7FF);
+        assert!(self.count <= 0x1F);
+
+        self.index | ((self.count as u16) << 11)
+    }
 }

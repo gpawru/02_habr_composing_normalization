@@ -1,45 +1,47 @@
 use std::collections::HashMap;
 
-use unicode_normalization_source::UNICODE;
+use unicode_normalization_source::{
+    properties::{CanonicalCombiningClass, Codepoint},
+    UNICODE,
+};
 
 #[test]
 fn test_nfc()
 {
-    nfc();
+    let pairs = pairs();
 }
 
-pub fn nfc()
+/// хешмап пар для композиции
+pub fn pairs() -> HashMap<u32, HashMap<u32, u32>>
 {
     let unicode = &UNICODE;
 
-    let mut count = 0;
+    let mut map: HashMap<u32, HashMap<u32, u32>> = HashMap::new();
 
-    let mut map: HashMap<u64, u32> = HashMap::new();
+    let mut i = 0;
 
-    for (_, codepoint) in unicode.iter() {
-        if codepoint.decomposition.len() == 2 && codepoint.decomposition_tag.is_none() {
-            let c0 = codepoint.decomposition[0];
-            let c1 = codepoint.decomposition[1];
-
-            let key = ((c0 as u64) << 32) | c1 as u64;
-
-            if map.contains_key(&key) {
-                panic!("{:X} {}", codepoint.code, codepoint.name);
-            }
-
-            let value = c1;
-
-            if map.values().any(|x| *x == c1) {
-                let iter = map.values().filter(|x| **x == c1);
-
-                println!("{:X} {}", c1, iter.count());
-            }
-
-            map.insert(key, value);
-
-            count += 1;
+    for codepoint in unicode.values() {
+        if codepoint.decomposition.len() != 2 || codepoint.decomposition_tag.is_some() {
+            continue;
         }
+
+        let c0 = codepoint.decomposition[0];
+        let c1 = codepoint.decomposition[1];
+
+        i += 1;
+
+        map.entry(c0)
+            .and_modify(|c| {
+                c.insert(c1, codepoint.code);
+            })
+            .or_insert({
+                let mut c = HashMap::new();
+                c.insert(c1, codepoint.code);
+                c
+            });
     }
 
-    println!("{}", count);
+    println!("{}", i);
+
+    map
 }
