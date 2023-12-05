@@ -30,11 +30,6 @@ fn ucd_test_nfc()
                 let normalizer = $normalizer;
 
                 for t in tests {
-                    println!("{} {}", t.line, t.description);
-                    if t.description.contains("HANGUL") || t.description.contains("KOREAN") {
-                        continue;
-                    }
-
                     test!(t.c2, t.c1, normalizer, t, "{} {}: c2 == toNFC(c1)");
                     test!(t.c2, t.c2, normalizer, t, "{} {}: c2 == toNFC(c2)");
                     test!(t.c2, t.c3, normalizer, t, "{} {}: c2 == toNFC(c3)");

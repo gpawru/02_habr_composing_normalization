@@ -4,20 +4,16 @@ use crate::ComposingNormalizer;
 #[test]
 fn test_combine()
 {
-    // 17115 (a◌̅◌̕◌̀◌֮b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; ) LATIN SMALL LETTER A, COMBINING OVERLINE, COMBINING COMMA ABOVE RIGHT, COMBINING GRAVE ACCENT, HEBREW ACCENT ZINOR, LATIN SMALL LETTER B
-    // 0061 0315 0300 05AE 0305 0062;00E0 05AE 0305 0315 0062;0061 05AE 0300 0305 0315 0062;00E0 05AE 0305 0315 0062;0061 05AE 0300 0305 0315 0062; # (a◌̕◌̀◌֮◌̅b; à◌֮◌̅◌̕b; a◌֮◌̀◌̅◌̕b; à◌֮◌̅◌̕b; a◌֮◌̀◌̅◌̕b; ) LATIN SMALL LETTER A, COMBINING COMMA ABOVE RIGHT, COMBINING GRAVE ACCENT, HEBREW ACCENT ZINOR, COMBINING OVERLINE, LATIN SMALL LETTER B
-
-    // 0061 0315 0300 05AE 0305 0062
-    // 00E0 05AE 0305 0315 0062
-
-    let source = "\u{2ADC}";
+    let source = "\u{09C7}\u{09BE}";
     let nfc = ComposingNormalizer::nfc();
 
     let result = nfc.normalize(source);
 
     for char in result.chars() {
-        println!("{:X}", u32::from(char));
+        print!("{:04X} ", u32::from(char));
     }
+
+    println!()
 }
 
 /// композиция кодпоинтов и их запись в результирующую строку
@@ -69,8 +65,25 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
     let mut tail: Vec<Codepoint> = Vec::with_capacity(len);
     let mut iter = buffer[1 ..].iter();
 
+    //
+    let mut recent_skipped_ccc = 0;
+
     for codepoint in iter.by_ref() {
+        let ccc = codepoint.ccc;
+
+        if ccc != 0 {
+            if ccc == recent_skipped_ccc {
+                tail.push(*codepoint);
+                continue;
+            }
+        } else if recent_skipped_ccc != 0 {
+            tail.push(*codepoint);
+            break;
+        }
+
         let combined = combine(&unwraped_combining, codepoint.code, compositions);
+
+        debug_assert!(codepoint.ccc >= recent_skipped_ccc);
 
         match combined {
             CombineResult::Combined(code, new_combining) => {
@@ -92,6 +105,7 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
             }
             CombineResult::None => {
                 tail.push(*codepoint);
+                recent_skipped_ccc = ccc;
             }
         }
     }
