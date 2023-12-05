@@ -1,4 +1,24 @@
 use crate::decomposition::Codepoint;
+use crate::ComposingNormalizer;
+
+#[test]
+fn test_combine()
+{
+    // 17115 (a◌̅◌̕◌̀◌֮b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; a◌֮◌̅◌̀◌̕b; ) LATIN SMALL LETTER A, COMBINING OVERLINE, COMBINING COMMA ABOVE RIGHT, COMBINING GRAVE ACCENT, HEBREW ACCENT ZINOR, LATIN SMALL LETTER B
+    // 0061 0315 0300 05AE 0305 0062;00E0 05AE 0305 0315 0062;0061 05AE 0300 0305 0315 0062;00E0 05AE 0305 0315 0062;0061 05AE 0300 0305 0315 0062; # (a◌̕◌̀◌֮◌̅b; à◌֮◌̅◌̕b; a◌֮◌̀◌̅◌̕b; à◌֮◌̅◌̕b; a◌֮◌̀◌̅◌̕b; ) LATIN SMALL LETTER A, COMBINING COMMA ABOVE RIGHT, COMBINING GRAVE ACCENT, HEBREW ACCENT ZINOR, COMBINING OVERLINE, LATIN SMALL LETTER B
+
+    // 0061 0315 0300 05AE 0305 0062
+    // 00E0 05AE 0305 0315 0062
+
+    let source = "\u{2ADC}";
+    let nfc = ComposingNormalizer::nfc();
+
+    let result = nfc.normalize(source);
+
+    for char in result.chars() {
+        println!("{:X}", u32::from(char));
+    }
+}
 
 /// композиция кодпоинтов и их запись в результирующую строку
 #[inline(always)]
@@ -47,7 +67,7 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
 
     // TODO: буфер хвоста нужно переиспользовать, чтобы избежать повторных аллокаций
     let mut tail: Vec<Codepoint> = Vec::with_capacity(len);
-    let mut iter = buffer[1 ..].iter().rev();
+    let mut iter = buffer[1 ..].iter();
 
     for codepoint in iter.by_ref() {
         let combined = combine(&unwraped_combining, codepoint.code, compositions);
@@ -61,13 +81,12 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
             CombineResult::Final(code) => {
                 // скомбинировали кодпоинты и оказалось, что больше скомбинировать ничего нельзя
 
-                result!(code);
+                starter = code;
+                is_final = true;
 
                 for codepoint in iter {
-                    result!(codepoint.code);
+                    tail.push(*codepoint);
                 }
-
-                is_final = true;
 
                 break;
             }
@@ -81,32 +100,29 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
 
     // если в результате получили единственный кодпоинт, который может быть скомбинирован с последующими,
     // то сохраняем его в буфер, в противном случае - записываем его в результат
-    if !is_final {
-        if tail.is_empty() && combining != 0 {
-            buffer.push(Codepoint {
-                ccc: 0,
-                code: starter,
-                combining,
-            });
+    if !is_final && tail.is_empty() {
+        buffer.push(Codepoint {
+            ccc: 0,
+            code: starter,
+            combining,
+        });
 
-            return;
-        }
-
-        result!(starter);
+        return;
     }
 
-    // остались нескомбинированные кодпоинты после стартера?
-    if !tail.is_empty() {
-        let from = match tail[0].combining {
-            0 => 0,
-            _ => {
-                buffer.push(tail[0]);
-                1
-            }
-        };
+    result!(starter);
 
-        for codepoint in tail[from ..].iter().rev() {
+    // остались нескомбинированные кодпоинты после стартера?
+    // в случае, если последний кодпоинт может быть скомбинирован с последующими -
+    // сохраняем его в буфере для следующей итерации
+    if let Some(last) = tail.pop() {
+        for codepoint in tail.iter() {
             result!(codepoint.code);
+        }
+
+        match last.combining {
+            0 => result!(last.code),
+            _ => buffer.push(last),
         }
     }
 }

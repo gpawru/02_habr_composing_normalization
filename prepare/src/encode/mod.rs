@@ -2,12 +2,11 @@ use unicode_normalization_source::{properties::*, UNICODE};
 
 use crate::{
     encode::composition::{
-        COMBINES_BACKWARDS, COMBINES_FORWARDS, COMPOSITION_PAIRS, COMPOSITION_REFS,
+        is_composition_exception, COMBINES_BACKWARDS, COMBINES_FORWARDS, COMPOSITION_PAIRS,
+        COMPOSITION_REFS,
     },
     output::stats::CodepointGroups,
 };
-
-use self::composition::CompositionInfo;
 
 pub mod composition;
 
@@ -46,7 +45,7 @@ pub fn encode_codepoint(
 
     let value = [
         starter,                    // стартер
-        starter_with_decomposition, // стартер, игнорируем декомпозицию
+        starter_with_decomposition, // стартер с декомпозицией в стартеры
         nonstarter,                 // не-стартер
         singleton,                  // синглтон
         pair16,                     // пара (16 бит)
@@ -138,13 +137,13 @@ fn starter_with_decomposition(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
     combines_backwards: bool,
-    combines_forwards: Option<u8>,
-    _: usize,
+    _: Option<u8>,
+    expansion_position: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
     if !codepoint.ccc.is_starter()
-        || decomposition.len() < 2
+        || decomposition.len() != 2
         || combines_backwards
         || decomposition.iter().any(|c| get_ccc(*c).is_non_starter())
     {
@@ -156,7 +155,9 @@ fn starter_with_decomposition(
         "заранее скомбинированный кодпоинт (стартер) не может комбинироваться с предыдущим кодпоинтом"
     );
 
-    let value = MARKER_STARTER + 9;
+    let value = MARKER_EXPANSION
+        | ((decomposition.len() as u64) << 8)
+        | ((expansion_position as u64) << 16);
 
     to_stats(
         stats,
@@ -164,8 +165,7 @@ fn starter_with_decomposition(
         codepoint,
         decomposition,
     );
-
-    Some((value, vec![]))
+    Some((value, map_expansion(decomposition)))
 }
 
 /// не-стартер:
@@ -284,12 +284,12 @@ fn pair16(
         Some(position) => {
             assert_eq!(position, 0);
 
-            (COMPOSITION_REFS.get(&(c1 as u32)).unwrap().bake() as u64) << 48
+            (COMPOSITION_REFS.get(&(c1 as u32)).unwrap().bake() as u64) << 16
         }
         None => 0,
     };
 
-    let value = MARKER_PAIR | (c2_ccc << 8) | (c1 << 16) | (c2 << 32) | compose_info;
+    let value = MARKER_PAIR | (c2_ccc << 8) | (c1 << 32) | (c2 << 48) | compose_info;
 
     to_stats(stats, "3. пары (16 бит)", codepoint, decomposition);
     Some((value, vec![]))

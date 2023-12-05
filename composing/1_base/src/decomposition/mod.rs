@@ -27,7 +27,7 @@ pub enum DecompositionValue
     /// декомпозиция на 3 кодпоинта, первый - стартер
     Triple(u32, Codepoint, Codepoint),
     /// синглтон (стартер, декомпозирующийся в другой стартер)
-    Singleton(u32),
+    Singleton(Codepoint),
     /// декомпозиция на несколько символов, в параметрах - индекс первого элемента в дополнительной таблице и количество этих элементов
     Expansion(u16, u8),
     /// декомпозиция слога хангыль на 2 чамо. отличие от обычной пары в том, что все символы декомпозиции - стартеры
@@ -87,7 +87,11 @@ fn parse_non_starter(value: u64) -> DecompositionValue
 #[inline(always)]
 fn parse_singleton(value: u64) -> DecompositionValue
 {
-    DecompositionValue::Singleton(o!(value, u32, 1))
+    DecompositionValue::Singleton(Codepoint {
+        ccc: 0,
+        code: o!(value, u32, 1),
+        combining: o!(value, u16, 1),
+    })
 }
 
 /// 16-битная пара
@@ -97,12 +101,12 @@ fn parse_pair_16bit(value: u64) -> DecompositionValue
     DecompositionValue::Pair(
         Codepoint {
             ccc: 0,
-            code: o!(value, u16, 1) as u32,
-            combining: o!(value, u16, 3),
+            code: o!(value, u16, 2) as u32,
+            combining: o!(value, u16, 1),
         },
         Codepoint {
             ccc: o!(value, u8, 1),
-            code: o!(value, u16, 2) as u32,
+            code: o!(value, u16, 3) as u32,
             combining: 0,
         },
     )

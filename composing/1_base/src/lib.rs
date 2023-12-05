@@ -62,18 +62,6 @@ impl<'a> ComposingNormalizer<'a>
         for char in input.chars() {
             let code = u32::from(char);
 
-            // у символа может быть декомпозиция: стартеры пишем в результат, не-стартеры - в буфер,
-            // если после не-стартера встречаем стартер - сортируем не-стартеры, записываем, сбрасываем буфер
-
-            // в случае композиции:
-            //
-            // 1. стартер без декомпозиции может быть комбинируемым первым
-            // 2. стартер без декомпозиции может быть комбинируемым последним
-            // 3. оба стартера, слева и справа - некомбинируемые
-            //
-            //
-            //
-
             let decomposition = self.decompose(code);
 
             match decomposition {
@@ -101,41 +89,44 @@ impl<'a> ComposingNormalizer<'a>
                 }
                 DecompositionValue::Pair(c1, c2) => {
                     // пара из стартера и не-стартера
-                    // 1. скомбинировать стартер с предыдущим блоком, записать
-                    // 2. дописать не-стартер
 
                     sort_by_ccc(&mut buffer);
                     buffer.push(c1);
                     combine_and_flush(&mut result, &mut buffer, self.compositions);
 
                     debug_assert_ne!(c2.ccc, 0);
+                    debug_assert!(!buffer.is_empty());
+
                     buffer.push(c2);
                 }
-                /*
                 DecompositionValue::Triple(c1, c2, c3) => {
                     // тройка - первый стартер, далее - не-стартеры
-                    // скомбинировать стартер с предыдущим блоком, записать
-                    // если последний кодпоинт получившейся последовательности - стартер, то оставить его в буфере + не-стартер (2й)
-                    panic!("TRIPLE");
-                    flush!(result, buffer);
-                    write!(result, c1);
 
-                    if c3.ccc == 0 {
-                        write!(result, c2.code, c3.code);
-                    } else {
-                        match c2.ccc == 0 {
-                            true => write!(result, c2.code),
-                            false => buffer.push(c2),
-                        }
-                        buffer.push(c3);
-                    }
+                    // нужен дополнительный запрос - посмотреть, может-ли быть скомбинирован стартер,
+                    // т.к. в записи эта информация не хранится
+                    let c1 = self.get_codepoint_for_starter(c1);
+
+                    debug_assert_eq!(c1.ccc, 0);
+
+                    sort_by_ccc(&mut buffer);
+                    buffer.push(c1);
+                    combine_and_flush(&mut result, &mut buffer, self.compositions);
+
+                    debug_assert_ne!(c2.ccc, 0);
+                    debug_assert_ne!(c3.ccc, 0);
+                    debug_assert!(!buffer.is_empty());
+
+                    buffer.push(c2);
+                    buffer.push(c3);
                 }
                 DecompositionValue::Singleton(c1) => {
                     // синглтоны не комбинируются с предыдущими кодпоинтами, но могут комбинироваться со следующими
-                    panic!("SINGLETON");
-                    flush!(result, buffer);
-                    write!(result, c1);
+
+                    sort_by_ccc(&mut buffer);
+                    buffer.push(c1);
+                    combine_and_flush(&mut result, &mut buffer, self.compositions);
                 }
+                /*
                 DecompositionValue::HangulPair(c1, c2) => {
                     panic!("HANGUL");
                     flush!(result, buffer);
@@ -145,9 +136,8 @@ impl<'a> ComposingNormalizer<'a>
                     panic!("HANGUL");
                     flush!(result, buffer);
                     write!(result, c1, c2, c3);
-                }
+                } */
                 DecompositionValue::Expansion(index, count) => {
-                    panic!("EXPANSION");
                     for entry in
                         &self.expansions[(index as usize) .. (index as usize + count as usize)]
                     {
@@ -156,21 +146,32 @@ impl<'a> ComposingNormalizer<'a>
 
                         match ccc == 0 {
                             true => {
-                                flush!(result, buffer);
-                                write!(result, code);
+                                let c1 = self.get_codepoint_for_starter(code);
+
+                                sort_by_ccc(&mut buffer);
+                                buffer.push(c1);
+                                combine_and_flush(&mut result, &mut buffer, self.compositions);
                             }
-                            false => buffer.push(Codepoint { code, ccc }),
+                            false => buffer.push(Codepoint {
+                                code,
+                                ccc,
+                                combining: 0,
+                            }),
                         }
                     }
-                }*/
+                }
                 _ => {
                     panic!("not implemented");
                 }
             }
         }
 
-        // flush!(result, buffer);
+        sort_by_ccc(&mut buffer);
         combine_and_flush(&mut result, &mut buffer, self.compositions);
+
+        for codepoint in buffer {
+            result.push(unsafe { char::from_u32_unchecked(codepoint.code) });
+        }
 
         result
     }
@@ -210,6 +211,22 @@ impl<'a> ComposingNormalizer<'a>
 
                 self.data[index]
             }
+        }
+    }
+
+    /// получаем данные для стартера о его возможной композиции
+    /// важно: работает только для стартеров без декомпозиции
+    #[inline]
+    fn get_codepoint_for_starter(&self, code: u32) -> Codepoint
+    {
+        let decomposition_value = self.get_decomposition_value(code);
+
+        debug_assert_eq!((decomposition_value as u8) & 0xF7, 0);
+
+        Codepoint {
+            ccc: 0,
+            code,
+            combining: o!(decomposition_value, u16, 1),
         }
     }
 }
