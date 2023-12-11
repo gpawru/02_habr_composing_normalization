@@ -1,10 +1,20 @@
 use crate::decomposition::Codepoint;
+use crate::write;
 use crate::ComposingNormalizer;
+
+use combine::{combine, CodepointCombining, CombineResult};
+
+mod combine;
 
 #[test]
 fn test_combine()
 {
-    let source = "\u{09C7}\u{09BE}";
+    // 1100 AC00 11A8;1100 AC01;1100 1100 1161 11A8;1100 AC01;1100 1100 1161 11A8; # (ᄀ각; ᄀ각; ᄀ각; ᄀ각; ᄀ각; ) HANGUL CHOSEONG KIYEOK, HANGUL SYLLABLE GA, HANGUL JONGSEONG KIYEOK
+
+    // 1100 AC00 11A8
+    // 1100 AC01
+
+    let source = "\u{1100}\u{AC00}\u{11A8}";
     let nfc = ComposingNormalizer::nfc();
 
     let result = nfc.normalize(source);
@@ -30,13 +40,6 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
     // первый кодпоинт должен быть стартером
     let mut combining = buffer[0].combining;
 
-    macro_rules! result {
-        ($code: expr) => {
-            // SAFETY: значения получены из таблицы валидных кодпоинтов или таблицы композиций
-            result.push(unsafe { char::from_u32_unchecked($code) })
-        }
-    }
-
     // если первый кодпоинт не комбинируется с идущими за ним кодпоинтами:
     //  - кодпоинты с первого по предпоследний добавляем в результат
     //  - последний ставим в начало буфера, если он может быть скомбинирован в дальнейшем
@@ -44,13 +47,13 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
         let last = buffer[len - 1];
 
         for codepoint in buffer[.. len - 1].iter() {
-            result!(codepoint.code);
+            write!(result, codepoint.code);
         }
 
         buffer.clear();
 
         match last.combining {
-            0 => result!(last.code),
+            0 => write!(result, last.code),
             _ => buffer.push(last),
         }
 
@@ -65,7 +68,6 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
     let mut tail: Vec<Codepoint> = Vec::with_capacity(len);
     let mut iter = buffer[1 ..].iter();
 
-    //
     let mut recent_skipped_ccc = 0;
 
     for codepoint in iter.by_ref() {
@@ -124,85 +126,26 @@ pub fn combine_and_flush(result: &mut String, buffer: &mut Vec<Codepoint>, compo
         return;
     }
 
-    result!(starter);
+    write!(result, starter);
 
     // остались нескомбинированные кодпоинты после стартера?
-    // в случае, если последний кодпоинт может быть скомбинирован с последующими -
-    // сохраняем его в буфере для следующей итерации
+    flush_tail(&mut tail, buffer, result);
+}
+
+/// записать оставшиеся после комбинирования символы
+/// в случае, если последний кодпоинт может быть скомбинирован с последующими -
+/// сохраняем его в буфере для следующей итерации
+#[inline(always)]
+fn flush_tail(tail: &mut Vec<Codepoint>, buffer: &mut Vec<Codepoint>, result: &mut String)
+{
     if let Some(last) = tail.pop() {
         for codepoint in tail.iter() {
-            result!(codepoint.code);
+            write!(result, codepoint.code);
         }
 
         match last.combining {
-            0 => result!(last.code),
+            0 => write!(result, last.code),
             _ => buffer.push(last),
         }
-    }
-}
-
-/// результат комбинирования кодпоинтов
-#[derive(Debug)]
-enum CombineResult
-{
-    /// кодпоинты скомбинированы, полученный кодпоинт также может быть скомбинирован
-    Combined(u32, u16),
-    /// кодпоинты скомбинированы, полученный кодпоинт не может быть скомбинирован
-    Final(u32),
-    /// кодпоинты не комбинируются
-    None,
-}
-
-/// скомбинировать два кодпоинта
-#[inline(always)]
-fn combine(combining: &CodepointCombining, second: u32, compositions: &[u64]) -> CombineResult
-{
-    let first = combining.index as usize;
-    let last = first + combining.count as usize;
-
-    for entry in &compositions[first .. last] {
-        let entry = *entry;
-        let entry_codepoint = entry as u32 & 0x3FFFF;
-
-        // кодпоинты комбинируются
-        if entry_codepoint == second {
-            let code = (entry >> 18) as u32 & 0x3FFFF;
-            let combining = (entry >> 48) as u16;
-
-            return match combining {
-                0 => CombineResult::Final(code),
-                _ => CombineResult::Combined(code, combining),
-            };
-        }
-    }
-
-    CombineResult::None
-}
-
-/// распакованная информация о комбинировании -
-/// индекс в таблице комбинаций и количество записанных для кодпоинта вариантов
-pub struct CodepointCombining
-{
-    index: u16,
-    count: u16,
-}
-
-impl From<u16> for CodepointCombining
-{
-    fn from(value: u16) -> Self
-    {
-        Self {
-            index: value & 0x7FF,
-            count: value >> 11,
-        }
-    }
-}
-
-/// отсортировать кодпоинты по CCC
-#[inline(always)]
-pub fn sort_by_ccc(buffer: &mut Vec<Codepoint>)
-{
-    if buffer.len() > 1 {
-        buffer.sort_by_key(|c| c.ccc);
     }
 }

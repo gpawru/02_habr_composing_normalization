@@ -126,17 +126,26 @@ impl<'a> ComposingNormalizer<'a>
                     buffer.push(c1);
                     combine_and_flush(&mut result, &mut buffer, self.compositions);
                 }
-                /*
-                DecompositionValue::HangulPair(c1, c2) => {
-                    panic!("HANGUL");
-                    flush!(result, buffer);
-                    write!(result, c1, c2);
-                }
-                DecompositionValue::HangulTriple(c1, c2, c3) => {
-                    panic!("HANGUL");
-                    flush!(result, buffer);
-                    write!(result, c1, c2, c3);
-                } */
+                // DecompositionValue::HangulPair(c1, c2) => {
+                //     sort_by_ccc(&mut buffer);
+                //     combine_and_flush(&mut result, &mut buffer, self.compositions);
+
+                //     for codepoint in buffer.iter() {
+                //         write!(result, codepoint.code);
+                //     }
+
+                //     write!(result, c1, c2);
+                // }
+                // DecompositionValue::HangulTriple(c1, c2, c3) => {
+                //     sort_by_ccc(&mut buffer);
+                //     combine_and_flush(&mut result, &mut buffer, self.compositions);
+
+                //     for codepoint in buffer.iter() {
+                //         write!(result, codepoint.code);
+                //     }
+
+                //     write!(result, c1, c2, c3);
+                // }
                 DecompositionValue::Expansion(index, count) => {
                     for entry in
                         &self.expansions[(index as usize) .. (index as usize + count as usize)]
@@ -160,9 +169,6 @@ impl<'a> ComposingNormalizer<'a>
                         }
                     }
                 }
-                _ => {
-                    panic!("not implemented");
-                }
             }
         }
 
@@ -170,7 +176,7 @@ impl<'a> ComposingNormalizer<'a>
         combine_and_flush(&mut result, &mut buffer, self.compositions);
 
         for codepoint in buffer {
-            result.push(unsafe { char::from_u32_unchecked(codepoint.code) });
+            write!(result, codepoint.code);
         }
 
         result
@@ -185,13 +191,15 @@ impl<'a> ComposingNormalizer<'a>
             return DecompositionValue::None(0);
         };
 
-        let lvt = code.wrapping_sub(HANGUL_S_BASE);
+        // let lvt = code.wrapping_sub(HANGUL_S_BASE);
 
-        if lvt > HANGUL_S_COUNT {
-            return parse_data_value(self.get_decomposition_value(code));
-        };
+        // if lvt > HANGUL_S_COUNT {
+        // return parse_data_value(self.get_decomposition_value(code));
+        // };
 
-        decompose_hangul(lvt)
+        // decompose_hangul(lvt)
+
+        parse_data_value(self.get_decomposition_value(code))
     }
 
     /// данные о декомпозиции символа
@@ -228,5 +236,14 @@ impl<'a> ComposingNormalizer<'a>
             code,
             combining: o!(decomposition_value, u16, 1),
         }
+    }
+}
+
+/// отсортировать кодпоинты по CCC
+#[inline(always)]
+pub fn sort_by_ccc(buffer: &mut Vec<Codepoint>)
+{
+    if buffer.len() > 1 {
+        buffer.sort_by_key(|c| c.ccc);
     }
 }

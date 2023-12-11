@@ -2,8 +2,7 @@ use unicode_normalization_source::{properties::*, UNICODE};
 
 use crate::{
     encode::composition::{
-        is_composition_exception, COMBINES_BACKWARDS, COMBINES_FORWARDS, COMPOSITION_PAIRS,
-        COMPOSITION_REFS,
+        COMBINES_BACKWARDS, COMBINES_FORWARDS, COMPOSITION_PAIRS, COMPOSITION_REFS,
     },
     output::stats::CodepointGroups,
 };
@@ -20,9 +19,6 @@ pub const MARKER_PAIR: u64 = 2;
 pub const MARKER_SINGLETON: u64 = 3;
 /// декомпозиция, вынесенная во внешний блок
 pub const MARKER_EXPANSION: u64 = 4;
-
-/// кодпоинт может быть скомбинирован с предыдущим
-pub const MARKER_COMBINES_BACKWARDS: u64 = 8;
 
 /// закодировать кодпоинт для таблицы данных
 pub fn encode_codepoint(
@@ -123,7 +119,7 @@ fn starter(
         );
     }
 
-    let value = MARKER_STARTER | compose_marker(combines_backwards) | compose_info;
+    let value = MARKER_STARTER | compose_info;
 
     Some((value, vec![]))
 }
@@ -186,7 +182,7 @@ fn nonstarter(
 
     let ccc = u64::from(codepoint.ccc);
 
-    let value = MARKER_NON_STARTER | compose_marker(combines_backwards) | (ccc << 8);
+    let value = MARKER_NON_STARTER | (ccc << 8);
 
     to_stats(
         stats,
@@ -390,7 +386,6 @@ fn starter_to_nonstarters(
     }
 
     let value = MARKER_EXPANSION
-        | compose_marker(combines_backwards)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
@@ -424,7 +419,6 @@ fn nonstarter_decomposition(
     }
 
     let value = MARKER_EXPANSION
-        | compose_marker(combines_backwards)
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
@@ -596,15 +590,6 @@ pub fn last_starter_combines_forwards(code: u32, decomposition: &Vec<u32>) -> Op
     }
 
     None
-}
-
-/// флаг комбинирования
-fn compose_marker(flag: bool) -> u64
-{
-    match flag {
-        true => MARKER_COMBINES_BACKWARDS,
-        false => 0,
-    }
 }
 
 /// скомбинировать декомпозицию, если:

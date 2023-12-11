@@ -30,10 +30,10 @@ pub enum DecompositionValue
     Singleton(Codepoint),
     /// декомпозиция на несколько символов, в параметрах - индекс первого элемента в дополнительной таблице и количество этих элементов
     Expansion(u16, u8),
-    /// декомпозиция слога хангыль на 2 чамо. отличие от обычной пары в том, что все символы декомпозиции - стартеры
-    HangulPair(u32, u32),
-    /// декомпозиция слога хангыль на 3 чамо, все элементы декомпозиции - стартеры
-    HangulTriple(u32, u32, u32),
+    // /// декомпозиция слога хангыль на 2 чамо. отличие от обычной пары в том, что все символы декомпозиции - стартеры
+    // HangulPair(u32, u32),
+    // /// декомпозиция слога хангыль на 3 чамо, все элементы декомпозиции - стартеры
+    // HangulTriple(u32, u32, u32),
 }
 
 /// кодпоинт для декомпозиции
@@ -48,18 +48,11 @@ pub struct Codepoint
     pub combining: u16,
 }
 
-/// можно-ли скомбинировать кодпоинт с предстоящим?
-#[inline(always)]
-pub fn combines_backwards(code: u64) -> bool
-{
-    (code as u8) & 0x08 != 0
-}
-
 /// парсим значение из таблицы
 #[inline(always)]
 pub fn parse_data_value(value: u64) -> DecompositionValue
 {
-    match (value as u8) & 0xF7 {
+    match value as u8 {
         MARKER_STARTER => parse_starter(value),
         MARKER_NON_STARTER => parse_non_starter(value),
         MARKER_PAIR => parse_pair_16bit(value),
