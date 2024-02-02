@@ -1,8 +1,7 @@
 use std::fmt::UpperHex;
 
 /// представить массив чисел в текстовом виде
-pub fn format_num_vec<T: UpperHex + Into<u64> + Copy>(input: &[T], boundary: usize) -> String
-{
+pub fn format_num_vec<T: UpperHex + Into<u64> + Copy>(input: &[T], boundary: usize) -> String {
     let mut output = String::new();
 
     let mut cur_len = boundary;

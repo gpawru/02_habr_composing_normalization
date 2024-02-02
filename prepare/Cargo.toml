@@ -7,3 +7,4 @@ publish = false
 [dependencies]
 unicode_normalization_source = { path = "./../source" }
 lazy_static = "1.4.0"
+icu_normalizer = "1.4.0"

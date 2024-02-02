@@ -66,8 +66,6 @@ pub fn unicode() -> HashMap<u32, Codepoint>
             simple_titlecase_mapping,
             decomposition_tag: decomposition.tag,
             decomposition: decomposition.codes,
-            canonical_decomposition: vec![],
-            compat_decomposition: vec![],
         };
 
         // различные блоки
@@ -129,65 +127,5 @@ pub fn unicode() -> HashMap<u32, Codepoint>
         map.insert(codepoint.code, codepoint);
     }
 
-    // в файле UnicodeData.txt хранится декомпозиция в сжатом виде, т.е. элементы декомпозиции
-    // могут также иметь свою декомпозицию. получаем развернутую версию
-    let map_source = map.clone();
-    let codes: Vec<&u32> = map_source.keys().collect();
-
-    for code in codes {
-        let canonical = decompose_entry(*code, &map_source, true).clone();
-        let compat = decompose_entry(*code, &map_source, false).clone();
-
-        let codepoint = map.get_mut(code).unwrap();
-
-        codepoint.canonical_decomposition = canonical;
-        codepoint.compat_decomposition = compat;
-    }
-
     map
-}
-
-/// построить развернутую декомпозицию символа
-fn decompose_entry(code: u32, unicode: &HashMap<u32, Codepoint>, canonical: bool) -> Vec<u32>
-{
-    // рассматриваемый кодпоинт
-    let codepoint = unicode.get(&code).unwrap();
-
-    // декомпозиция рассматриваемого кодпоинта
-    let source = codepoint.decomposition.clone();
-
-    let mut result: Vec<u32> = vec![];
-
-    // хотим получить каноническую декомпозицию, у элемента - декомопозиция совместимости
-    if canonical && codepoint.decomposition_tag.is_some() {
-        return result;
-    }
-
-    // проходим по всем элементам декомпозиции
-    for i in &source {
-        let element = unicode.get(i);
-
-        // если элемент не найден, то просто добавляем его в список - у него ccc = 0, декомпозиции не имеет
-        if element.is_none() {
-            result.push(*i);
-            continue;
-        }
-
-        // элемент декомпозиции (кодпоинт) существует в таблице
-        let element = element.unwrap();
-
-        // получаем декомпозицию элемента (если она есть)
-        let mut element_result = decompose_entry(element.code, unicode, canonical);
-
-        // у элемента нет декомпозиции
-        if element.decomposition.is_empty() || element_result.is_empty() {
-            result.push(*i);
-            continue;
-        }
-
-        // добавляем декомпозицию
-        result.append(&mut element_result);
-    }
-
-    result
 }

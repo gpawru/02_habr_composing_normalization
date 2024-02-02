@@ -1,25 +1,27 @@
 use std::fs::File;
 use std::io::Write;
 
-use self::stats::format_codepoint_groups;
-use crate::format_num_vec;
-use crate::tables::STARTING_CODEPOINTS_BLOCK;
+use crate::tables::{COMPOSITION_TABLE_DATA, CONTINUOUS_BLOCK_END};
 
-pub mod format;
-pub mod stats;
+use self::format::format_num_vec;
+
+mod format;
+mod stats;
 
 /// длина строки в файле с подготовленными данными
 const FORMAT_STRING_LENGTH: usize = 120;
 
 /// пишем данные о декомпозиции
-pub fn write(canonical: bool, file: &mut File, stats_file: &mut File)
+pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
 {
-    let (index, data, expansions, compositions, stats) = crate::tables::prepare(canonical);
+    let tables = crate::tables::prepare(canonical);
 
-    let (name, dec_starts_at) = match canonical {
-        true => ("NFD", 0xC0),
-        false => ("NFKD", 0xA0),
+    let (name, _) = match canonical {
+        true => ("NFC", 0xC0),
+        false => ("NFKC", 0xA0),
     };
+
+    let dec_starts_at = 0;
 
     let output = format!(
         "CompositionData {{\n  \
@@ -30,22 +32,22 @@ pub fn write(canonical: bool, file: &mut File, stats_file: &mut File)
             continuous_block_end: 0x{:04X},\n  \
             dec_starts_at: 0x{:04X},\n\
         }}\n",
-        format_num_vec(index.as_slice(), FORMAT_STRING_LENGTH),
-        format_num_vec(data.as_slice(), FORMAT_STRING_LENGTH),
-        format_num_vec(expansions.as_slice(), FORMAT_STRING_LENGTH),
-        format_num_vec(compositions.as_slice(), FORMAT_STRING_LENGTH),
-        STARTING_CODEPOINTS_BLOCK,
+        format_num_vec(tables.index.as_slice(), FORMAT_STRING_LENGTH),
+        format_num_vec(tables.data.as_slice(), FORMAT_STRING_LENGTH),
+        format_num_vec(tables.expansions.as_slice(), FORMAT_STRING_LENGTH),
+        format_num_vec(COMPOSITION_TABLE_DATA.as_slice(), FORMAT_STRING_LENGTH),
+        CONTINUOUS_BLOCK_END,
         dec_starts_at
     );
 
     write!(file, "{}", output).unwrap();
-    write!(stats_file, "{}", format_codepoint_groups(stats)).unwrap();
 
     stats::print(
         name,
-        index.as_slice(),
-        data.as_slice(),
-        expansions.as_slice(),
+        tables.index.as_slice(),
+        tables.data.as_slice(),
+        tables.expansions.as_slice(),
         dec_starts_at,
     );
+    println!("  размер блока композиций: {}", COMPOSITION_TABLE_DATA.len() * 8);
 }

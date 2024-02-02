@@ -44,10 +44,39 @@ pub struct Codepoint
     pub decomposition_tag: Option<DecompositionTag>,
     /// декомпозиция
     pub decomposition: Vec<u32>,
-    /// полная каноническая декомпозиция
-    pub canonical_decomposition: Vec<u32>,
-    /// полная декомпозиция совместимости
-    pub compat_decomposition: Vec<u32>,
+}
+
+impl Codepoint
+{
+    // стартер?
+    pub fn is_starter(&self) -> bool
+    {
+        self.ccc.is_starter()
+    }
+
+    // нестартер?
+    pub fn is_nonstarter(&self) -> bool
+    {
+        self.ccc.is_nonstarter()
+    }
+
+    // как символ
+    pub fn as_char(&self) -> char
+    {
+        char::from_u32(self.code).unwrap()
+    }
+
+    /// ASCII (Basic Latin)?
+    pub fn is_ascii(&self) -> bool
+    {
+        self.code <= 0x7F
+    }
+
+    /// Basic Multilingual Plane?
+    pub fn is_bmp(&self) -> bool
+    {
+        self.code <= 0xFFFF
+    }
 }
 
 #[derive(Debug, PartialEq)]

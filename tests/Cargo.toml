@@ -11,6 +11,3 @@ unicode_normalization_source = { path = "./../source" }
 
 unicode_composing_v1 = { path = "./../composing/1_base" }
 unicode_composing_v2 = { path = "./../composing/2_opt" }
-
-[profile.test]
-opt-level = 3
