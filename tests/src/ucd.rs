@@ -1,6 +1,7 @@
 use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
 
-use unicode_composing_v1::ComposingNormalizer as v1;
+use unicode_composing_v0::ComposingNormalizer as v0;
+// use unicode_composing_v1::ComposingNormalizer as v1;
 // use unicode_composing_v2::DecomposingNormalizer as v2;
 
 macro_rules! test {
@@ -9,7 +10,7 @@ macro_rules! test {
             $left,
             $normalizer.normalize(&$right),
             stringify!($str),
-            $test.line,
+            $test.line + 1,
             $test.description
         );
     };
@@ -40,32 +41,32 @@ fn ucd_test_nfc()
         };
     }
 
-    test_group!(v1::nfc() /*, v2::nfc() */);
+    test_group!(v0::nfc());
 }
 
-// /// тесты NFKC нормализации из UCD
-// #[test]
-// fn ucd_test_nfkc()
-// {
-//     // c4 == toNFKC(c1) == toNFKC(c2) == toNFKC(c3) == toNFKC(c4) == toNFKC(c5)
+/// тесты NFKC нормализации из UCD
+#[test]
+fn ucd_test_nfkc()
+{
+    // c4 == toNFKC(c1) == toNFKC(c2) == toNFKC(c3) == toNFKC(c4) == toNFKC(c5)
 
-//     let tests: &Vec<NormalizationTest> = &NORMALIZATION_TESTS;
+    let tests: &Vec<NormalizationTest> = &NORMALIZATION_TESTS;
 
-//     macro_rules! test_group {
-//         ($($normalizer: expr),+) => {
-//             $(
-//             let normalizer = $normalizer;
+    macro_rules! test_group {
+        ($($normalizer: expr),+) => {
+            $(
+            let normalizer = $normalizer;
 
-//             for t in tests {
-//                 test!(t.c5, t.c1, normalizer, t, "{} {}: c5 == toNFKD(c1)");
-//                 test!(t.c5, t.c2, normalizer, t, "{} {}: c5 == toNFKD(c2)");
-//                 test!(t.c5, t.c3, normalizer, t, "{} {}: c5 == toNFKD(c3)");
-//                 test!(t.c5, t.c4, normalizer, t, "{} {}: c5 == toNFKD(c4)");
-//                 test!(t.c5, t.c5, normalizer, t, "{} {}: c5 == toNFKD(c5)");
-//             }
-//         )+
-//         };
-//     }
+            for t in tests {
+                test!(t.c4, t.c1, normalizer, t, "{} {}: c5 == toNFKD(c1)");
+                test!(t.c4, t.c2, normalizer, t, "{} {}: c5 == toNFKD(c2)");
+                test!(t.c4, t.c3, normalizer, t, "{} {}: c5 == toNFKD(c3)");
+                test!(t.c4, t.c4, normalizer, t, "{} {}: c5 == toNFKD(c4)");
+                test!(t.c4, t.c5, normalizer, t, "{} {}: c5 == toNFKD(c5)");
+            }
+        )+
+        };
+    }
 
-//     test_group!(v1::nfkd(), v2::nfkd());
-// }
+    test_group!(v0::nfkc());
+}

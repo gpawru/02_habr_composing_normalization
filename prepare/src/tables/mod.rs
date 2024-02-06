@@ -1,4 +1,6 @@
 mod compositions;
+use std::collections::HashMap;
+
 pub use compositions::*;
 
 use unicode_normalization_source::UNICODE;
@@ -40,7 +42,8 @@ macro_rules! block_for {
 }
 
 /// подготавливаем таблицы NFC, NFKC
-pub fn prepare(canonical: bool) -> ComposingNormalizationTables
+pub fn prepare(canonical: bool, stats: &mut HashMap<String, usize>)
+    -> ComposingNormalizationTables
 {
     let mut index = [u32::MAX; MAX_BLOCKS as usize + 1];
     let mut data: Vec<u64> = vec![];
@@ -66,7 +69,7 @@ pub fn prepare(canonical: bool) -> ComposingNormalizationTables
                 }
             };
 
-            let encoded = encode_codepoint(codepoint, canonical, expansions.len());
+            let encoded = encode_codepoint(codepoint, canonical, expansions.len(), stats);
 
             if encoded.value > 0 {
                 has_contents = true;

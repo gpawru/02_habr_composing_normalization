@@ -1,12 +1,18 @@
 use std::collections::HashMap;
 
-use unicode_normalization_source::COMPOSITION_PAIRS;
+use unicode_normalization_source::{COMBINES_BACKWARDS, COMPOSITION_PAIRS};
 
 lazy_static! {
-    static ref COMPOSITION_TABLE: (Vec<u64>, HashMap<u32, CompositionInfo>) = compositions();
+    static ref COMPOSITION_TABLE: (
+        Vec<u64>,
+        HashMap<u32, CompositionInfo>,
+        HashMap<u32, CompositionInfo>
+    ) = compositions();
     pub static ref COMPOSITION_TABLE_DATA: &'static Vec<u64> = &self::COMPOSITION_TABLE.0;
     pub static ref COMPOSITION_TABLE_INDEX: &'static HashMap<u32, CompositionInfo> =
         &COMPOSITION_TABLE.1;
+    pub static ref COMPOSITION_TABLE_BACKWARDS_INDEX: &'static HashMap<u32, CompositionInfo> =
+        &COMPOSITION_TABLE.2;
 }
 
 /// "запеченные" композиции - массив значений и индексы для кодпоинтов
@@ -17,7 +23,11 @@ lazy_static! {
 ///     xx.. - второй кодпоинт
 ///     yy.. - результат комбинирования
 ///     ii.. - сжатая информация о композициях результата (см. CompositionInfo)
-fn compositions() -> (Vec<u64>, HashMap<u32, CompositionInfo>)
+fn compositions() -> (
+    Vec<u64>,
+    HashMap<u32, CompositionInfo>,
+    HashMap<u32, CompositionInfo>,
+)
 {
     let mut data = Vec::new();
     let mut indexes = HashMap::new();
@@ -52,6 +62,34 @@ fn compositions() -> (Vec<u64>, HashMap<u32, CompositionInfo>)
         }
     }
 
+    // дополнительная часть - комбинирование с предыдущим кодпоинтом
+    let mut backwards_indexes = HashMap::new();
+
+    let mut combining_backwards: Vec<&u32> = COMBINES_BACKWARDS.keys().collect();
+    combining_backwards.sort();
+
+    for starter in combining_backwards {
+        let pairs = &COMBINES_BACKWARDS[starter];
+
+        let mut prevs: Vec<&u32> = pairs.keys().collect();
+        prevs.sort();
+
+        backwards_indexes.insert(
+            *starter,
+            CompositionInfo {
+                index: data.len() as u16,
+                count: prevs.len() as u8,
+            },
+        );
+
+        for prev in prevs {
+            let combined = pairs.get(prev).unwrap();
+            let value = (*prev as u64) | ((combined.code as u64) << 18);
+
+            data.push(value);
+        }
+    }
+
     // для каждой записанной комбинируемой пары записываем дополнительную информацию - ссылку на варианты комбинирования
     // получаемого кодпоинта и количество вариантов
     for value in data.iter_mut() {
@@ -62,7 +100,7 @@ fn compositions() -> (Vec<u64>, HashMap<u32, CompositionInfo>)
         }
     }
 
-    (data, indexes)
+    (data, indexes, backwards_indexes)
 }
 
 /// информация о хранимых композициях для стартера

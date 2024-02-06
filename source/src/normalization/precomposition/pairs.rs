@@ -6,7 +6,7 @@ lazy_static! {
     /// комбинируемые кодпоинты
     pub static ref COMPOSITION_PAIRS: HashMap<u32, HashMap<u32, Codepoint>> = pairs();
     /// кодпоинты, комбинируемые с предыдущими
-    pub static ref COMBINES_BACKWARDS: Vec<u32> = combines_backwards();
+    pub static ref COMBINES_BACKWARDS: HashMap<u32, HashMap<u32, Codepoint>> = combines_backwards();
 }
 
 /// хешмап пар для композиции
@@ -49,9 +49,9 @@ fn pairs() -> HashMap<u32, HashMap<u32, Codepoint>>
 }
 
 /// может ли быть скомбинирован с каким-либо предстоящим кодпоинтом?
-fn combines_backwards() -> Vec<u32>
+fn combines_backwards() -> HashMap<u32, HashMap<u32, Codepoint>>
 {
-    let mut map = Vec::new();
+    let mut map: HashMap<u32, HashMap<u32, Codepoint>> = HashMap::new();
 
     for entry in UNICODE.values() {
         // декомпозиция отсутствует, синглтон или не является канонической
@@ -63,7 +63,16 @@ fn combines_backwards() -> Vec<u32>
             continue;
         }
 
-        map.push(entry.decomposition[1]);
+        let c0 = entry.decomposition[0];
+        let c1 = entry.decomposition[1];
+
+        if !map.contains_key(&c1) {
+            map.insert(c1, HashMap::new());
+        }
+
+        map.entry(c1)
+            .or_insert(HashMap::new())
+            .insert(c0, entry.clone());
     }
 
     map

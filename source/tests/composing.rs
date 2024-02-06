@@ -1,8 +1,8 @@
 use icu_normalizer::ComposingNormalizer;
-use unicode_normalization_source::normalization::precomposition::hangul::is_composable_hangul;
 use unicode_normalization_source::normalization::precomposition::combine;
+use unicode_normalization_source::normalization::precomposition::hangul::is_composable_hangul;
 use unicode_normalization_source::properties::Codepoint;
-use unicode_normalization_source::{NFC, NFKC, UNICODE, COMPOSITION_PAIRS};
+use unicode_normalization_source::{COMPOSITION_PAIRS, NFC, NFKC, UNICODE};
 
 #[test]
 fn test_nfc()

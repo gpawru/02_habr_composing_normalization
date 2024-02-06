@@ -67,7 +67,7 @@ impl<'a> ComposingNormalizer<'a>
             match decomposition {
                 DecompositionValue::None(combining) => {
                     // не имеет декомпозиции, может (но не обязательно) комбинироваться с далее идущими кодпоинтами
-
+                    
                     sort_by_ccc(&mut buffer);
 
                     buffer.push(Codepoint {

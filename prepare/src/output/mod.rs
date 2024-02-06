@@ -1,5 +1,5 @@
-use std::fs::File;
 use std::io::Write;
+use std::{collections::HashMap, fs::File};
 
 use crate::tables::{COMPOSITION_TABLE_DATA, CONTINUOUS_BLOCK_END};
 
@@ -14,7 +14,8 @@ const FORMAT_STRING_LENGTH: usize = 120;
 /// пишем данные о декомпозиции
 pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
 {
-    let tables = crate::tables::prepare(canonical);
+    let mut stats = HashMap::new();
+    let tables = crate::tables::prepare(canonical, &mut stats);
 
     let (name, _) = match canonical {
         true => ("NFC", 0xC0),
@@ -48,6 +49,11 @@ pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
         tables.data.as_slice(),
         tables.expansions.as_slice(),
         dec_starts_at,
+        stats
     );
-    println!("  размер блока композиций: {}", COMPOSITION_TABLE_DATA.len() * 8);
+    println!(
+        "  размер блока композиций: {}",
+        COMPOSITION_TABLE_DATA.len() * 8
+    );
+    
 }
