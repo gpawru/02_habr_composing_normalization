@@ -1,34 +1,34 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use icu_normalizer::DecomposingNormalizer;
+use icu_normalizer::ComposingNormalizer;
 
 mod group;
 
 group!(
     "./../test_data/texts",
-    nfd,
-    test_nfd,
-    "nfd",
+    nfc,
+    test_nfc,
+    "nfc",
     "icu",
-    DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
+    ComposingNormalizer::new_nfc()
 );
 
 group!(
     "./../test_data/texts",
-    nfkd,
-    test_nfkd,
-    "nfkd",
+    nfkc,
+    test_nfkc,
+    "nfkc",
     "icu",
-    DecomposingNormalizer::try_new_nfkd_unstable(&icu_testdata::unstable()).unwrap()
+    ComposingNormalizer::new_nfkc()
 );
 
-group!(
-    "./../test_data/texts_decomposed",
-    dec,
-    test_dec,
-    "dec",
-    "icu",
-    DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
-);
+// group!(
+//     "./../test_data/texts_decomposed",
+//     dec,
+//     test_dec,
+//     "dec",
+//     "icu",
+//     DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
+// );
 
-criterion_group!(benches, nfd, nfkd, dec);
+criterion_group!(benches, nfc, nfkc);
 criterion_main!(benches);

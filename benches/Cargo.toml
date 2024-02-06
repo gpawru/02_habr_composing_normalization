@@ -5,21 +5,20 @@ edition = "2021"
 
 [dev-dependencies]
 criterion = "0.5.1"
-icu_normalizer = "1.2.0"
-icu_testdata = "1.2.0"
+icu_normalizer = "1.4.1"
 
-unicode_decomposing_v1 = { path = "./../decomposing/1_base" }
-unicode_decomposing_v2 = { path = "./../decomposing/2_opt" }
-
-[[bench]]
-name = "v1"
-path = "benches/v1.rs"
-harness = false
+unicode_composing_v0 = { path = "./../composing/0_base" }
+# unicode_decomposing_v2 = { path = "./../decomposing/2_opt" }
 
 [[bench]]
-name = "v2"
-path = "benches/v2.rs"
+name = "v0"
+path = "benches/v0.rs"
 harness = false
+
+# [[bench]]
+# name = "v2"
+# path = "benches/v2.rs"
+# harness = false
 
 [[bench]]
 name = "icu"

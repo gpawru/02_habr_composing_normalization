@@ -5,7 +5,7 @@ pub const MEASUREMENT_TIME: u64 = 7;
 macro_rules! group {
     ($dir: expr, $fn: ident, $test: ident, $group: expr,  $name:expr,  $normalizer: expr) => {
         #[inline(never)]
-        fn $test(normalizer: &DecomposingNormalizer, source: &str) -> String
+        fn $test(normalizer: &ComposingNormalizer, source: &str) -> String
         {
             normalizer.normalize(source)
         }

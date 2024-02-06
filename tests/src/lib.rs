@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod ucd;
 
-// #[cfg(test)]
-// mod icu;
+#[cfg(test)]
+mod icu;
 
-// pub mod data;
+pub mod data;
