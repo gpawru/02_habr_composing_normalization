@@ -102,10 +102,10 @@ impl<'a> ComposingNormalizer<'a>
                     combining = new_combining;
                 }
                 // синглтон
-                DecompositionValue::Singleton(c0, new_combining) => {
+                DecompositionValue::Singleton(code, new_combining) => {
                     combine_and_write(&mut buffer, &mut result, combining, self.compositions);
 
-                    buffer.push(c0);
+                    buffer.push(Codepoint { code, ccc: 0 });
 
                     combining = new_combining;
                 }

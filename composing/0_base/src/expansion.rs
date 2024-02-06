@@ -37,7 +37,7 @@ pub struct Expansion
 ///  - > 2 кодпоинтов или состоящая из кодпоинтов за пределами BMP
 ///  - 2 стартера + нестартер
 ///  - нестартеры
-#[inline(always)]
+#[inline(never)]
 pub fn combine_expansion(
     buffer: &mut Vec<Codepoint>,
     result: &mut String,
