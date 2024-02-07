@@ -3,6 +3,8 @@ use composition::*;
 use decomposition::*;
 use expansion::*;
 use hangul::*;
+use slice::aligned::Aligned;
+use slice::iter::CharsIter;
 
 mod codepoint;
 mod composition;
@@ -11,19 +13,21 @@ mod decomposition;
 mod expansion;
 mod hangul;
 mod macros;
+mod slice;
+mod utf8;
 
 /// нормализатор NF(K)C
 #[repr(align(128))]
 pub struct ComposingNormalizer<'a>
 {
     /// индекс блока. u8 достаточно, т.к. в NFC последний блок - 0x40, в NFKC - 0x6F (+1 для пустого блока)
-    pub index: &'a [u8],
+    pub index: Aligned<'a, u8>,
     /// основные данные
-    pub data: &'a [u64],
+    pub data: Aligned<'a, u64>,
     /// данные кодпоинтов, которые не вписываются в основную часть
-    pub expansions: &'a [u32],
+    pub expansions: Aligned<'a, u32>,
     /// композиции
-    pub compositions: &'a [u64],
+    pub compositions: Aligned<'a, u64>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     pub continuous_block_end: u32,
     /// до этого кодпоинта все кодпоинты - стартеры (0xC0/0xA0)
@@ -35,10 +39,10 @@ impl<'a> From<data::CompositionData<'a>> for ComposingNormalizer<'a>
     fn from(source: data::CompositionData<'a>) -> Self
     {
         Self {
-            index: source.index,
-            data: source.data,
-            expansions: source.expansions,
-            compositions: source.compositions,
+            index: Aligned::from(source.index),
+            data: Aligned::from(source.data),
+            expansions: Aligned::from(source.expansions),
+            compositions: Aligned::from(source.compositions),
             continuous_block_end: source.continuous_block_end,
             decompositions_start: source.decompositions_start,
         }
@@ -74,10 +78,63 @@ impl<'a> ComposingNormalizer<'a>
         //  - стартер + нестартер(ы)
         //  - нестартер(ы)
 
-        for char in input.chars() {
-            let code = u32::from(char);
+        let decompositions_start = self.decompositions_start;
 
-            let decomposition = self.decompose(code);
+        let iter = &mut CharsIter::new(input);
+
+        loop {
+            iter.set_breakpoint();
+
+            let (decomposition, code) = loop {
+                if iter.is_empty() {
+                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
+                    write_str!(result, iter.ending_slice());
+
+                    return result;
+                }
+
+                let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+
+                // текст, состоящий только из ASCII-символов уже NF(KC) нормализован
+                if first < 0x80 {
+                    continue;
+                }
+
+                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+
+                // символы в пределах границы блока символов, не имеющих декомпозиции
+                if code < decompositions_start {
+                    continue;
+                }
+
+                // символ за границами "безопасной зоны". проверяем кейс декомпозиции:
+                // если он является обычным стартером без декомпозиции, то продолжаем цикл
+                let decomposition = self.decompose(code);
+
+                break (decomposition, code);
+
+                // if !decomposition.is_none() {
+                //     // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
+                //     let width = match code {
+                //         0x00 ..= 0x7F => unreachable!(),
+                //         0x80 ..= 0x07FF => 2,
+                //         0x0800 ..= 0xFFFF => 3,
+                //         0x10000 ..= 0x10FFFF => 4,
+                //         _ => unreachable!(),
+                //     };
+
+                //     // если мы получили какую-то последовательность символов без декомпозиции:
+                //     //  - сливаем буфер предшествующих этому отрезку не-стартеров
+                //     //  - сливаем отрезок от брейкпоинта до предыдущего символа
+
+                //     if !iter.at_breakpoint(width) {
+                //         flush!(result, buffer);
+                //         write_str!(result, iter.block_slice(width));
+                //     }
+
+                //     break (decomposition, code);
+                // }
+            };
 
             // помним, что стартеры могут быть скомбинированы с предыдущими кодпоинтами в большинстве случаев,
             // и этот кейс вынесен в отдельный блок (как редковстречаемый), чтобы уменьшить количество проверок в цикле
@@ -85,7 +142,7 @@ impl<'a> ComposingNormalizer<'a>
             match decomposition {
                 // стартер
                 DecompositionValue::None(new_combining) => {
-                    combine_and_write(&mut buffer, &mut result, combining, self.compositions);
+                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
 
                     buffer.push(Codepoint { code, ccc: 0 });
 
@@ -97,7 +154,7 @@ impl<'a> ComposingNormalizer<'a>
                 }
                 // пара стартер-нестартер
                 DecompositionValue::Pair(c0, c1, new_combining) => {
-                    combine_and_write(&mut buffer, &mut result, combining, self.compositions);
+                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
 
                     buffer.push(c0);
                     buffer.push(c1);
@@ -106,7 +163,7 @@ impl<'a> ComposingNormalizer<'a>
                 }
                 // синглтон
                 DecompositionValue::Singleton(code, new_combining) => {
-                    combine_and_write(&mut buffer, &mut result, combining, self.compositions);
+                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
 
                     buffer.push(Codepoint { code, ccc: 0 });
 
@@ -120,8 +177,8 @@ impl<'a> ComposingNormalizer<'a>
                         code,
                         combining,
                         expansion,
-                        self.compositions,
-                        self.expansions,
+                        &self.compositions,
+                        &self.expansions,
                     );
                 }
                 // гласная или завершающая согласная чамо хангыль
@@ -135,7 +192,7 @@ impl<'a> ComposingNormalizer<'a>
                                 &mut buffer,
                                 &mut result,
                                 combining,
-                                self.compositions,
+                                &self.compositions,
                             );
                             write!(result, code);
                         }
@@ -145,10 +202,6 @@ impl<'a> ComposingNormalizer<'a>
                 }
             }
         }
-
-        combine_and_write(&mut buffer, &mut result, combining, self.compositions);
-
-        result
     }
 
     /// получить декомпозицию символа

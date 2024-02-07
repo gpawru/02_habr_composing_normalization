@@ -1001,5 +1001,5 @@ CompositionData {
     0x452ED14B9, 0x452F914B9, 0x456E915B8, 0x456ED15B9, 0x464E11935, 
  ],
   continuous_block_end: 0x0FFF,
-  dec_starts_at: 0x0000,
+  decompositions_start: 0x00C0,
 }

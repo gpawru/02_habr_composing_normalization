@@ -12,14 +12,14 @@ group!(
     ComposingNormalizer::new_nfc()
 );
 
-group!(
-    "./../test_data/texts",
-    nfkc,
-    test_nfkc,
-    "nfkc",
-    "icu",
-    ComposingNormalizer::new_nfkc()
-);
+// group!(
+//     "./../test_data/texts",
+//     nfkc,
+//     test_nfkc,
+//     "nfkc",
+//     "icu",
+//     ComposingNormalizer::new_nfkc()
+// );
 
 // group!(
 //     "./../test_data/texts_decomposed",
@@ -30,5 +30,5 @@ group!(
 //     DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
 // );
 
-criterion_group!(benches, nfc, nfkc);
+criterion_group!(benches, nfc /*, nfkc*/);
 criterion_main!(benches);

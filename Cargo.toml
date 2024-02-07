@@ -4,9 +4,9 @@ members = [
     "./source",
     "./prepare",
     "./composing/0_base",
-    "./composing/1_base",
-    "./composing/2_opt",
+    "./composing/1_opt",
     "./tests",
+    "./_reports",
 ]
 resolver = "2"
 

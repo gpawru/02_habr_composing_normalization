@@ -18,3 +18,6 @@ clean:
 # подготовка данных
 bake:
 	cd prepare && cargo run
+
+report:
+	cd _reports && cargo run

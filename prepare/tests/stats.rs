@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use unicode_normalization_prepare::encode::encode_codepoint;
+use unicode_normalization_prepare::encode::{encode_codepoint, MARKER_SINGLETON, MARKER_STARTER};
 use unicode_normalization_source::{
     properties::Codepoint, COMPOSITION_EXCLUSIONS, COMPOSITION_PAIRS, NFC, NFKC, UNICODE,
 };
@@ -28,6 +28,50 @@ fn last_decomposing_code()
         "последний стартер без декомозиций и комбинирования: {:04X}",
         last
     )
+}
+
+/// мини-карта
+#[test]
+fn nfc_start()
+{
+    let mut first_com = 0;
+    let mut first_dec = 0;
+
+    for code in 0u32 ..= 0x7FFF {
+        if code % 32 == 0 {
+            print!("\n{:04X} ", (code / 32) * 32);
+        }
+
+        let c = match &UNICODE.get(&code) {
+            Some(codepoint) => {
+                let mut stats = HashMap::new();
+
+                let encoded = encode_codepoint(codepoint, true, 0, &mut stats);
+
+                match (encoded.value as u8) as u64 {
+                    MARKER_STARTER => '.',
+                    MARKER_SINGLETON => {
+                        if first_com == 0 {
+                            first_com = code;
+                        };
+                        's'
+                    }
+                    _ => {
+                        if first_dec == 0 {
+                            first_dec = code;
+                        }
+                        'd'
+                    }
+                }
+            }
+            None => '.',
+        };
+
+        print!("{} ", c);
+    }
+    println!();
+    println!("первый s: {:04X}", first_com);
+    println!("первый d: {:04X}", first_dec);
 }
 
 #[test]
@@ -65,15 +109,7 @@ fn stats(precomposed: &HashMap<u32, Vec<Codepoint>>) -> HashMap<String, usize>
     let mut stats: HashMap<String, usize> = HashMap::new();
 
     for code in codepoints.iter() {
-        let precomposition = &precomposed[code];
-
-        let starters_map: String = precomposition
-            .iter()
-            .map(|c| match c.is_starter() {
-                true => 's',
-                false => 'n',
-            })
-            .collect();
+        let starters_map = starters_map(*code, precomposed);
 
         if starters_map.is_empty() {
             continue;
@@ -86,6 +122,19 @@ fn stats(precomposed: &HashMap<u32, Vec<Codepoint>>) -> HashMap<String, usize>
     }
 
     stats
+}
+
+fn starters_map(code: u32, precomposed: &HashMap<u32, Vec<Codepoint>>) -> String
+{
+    let precomposition = &precomposed[&code];
+
+    precomposition
+        .iter()
+        .map(|c| match c.is_starter() {
+            true => 's',
+            false => 'n',
+        })
+        .collect()
 }
 
 /// стартеры, комбинируемые с предыдущими кодпоинтами (пробуем найти закономерности для оптимизаций)
