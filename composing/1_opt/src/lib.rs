@@ -111,29 +111,31 @@ impl<'a> ComposingNormalizer<'a>
                 // если он является обычным стартером без декомпозиции, то продолжаем цикл
                 let decomposition = self.decompose(code);
 
-                break (decomposition, code);
+                if !decomposition.is_none() {
+                    // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
+                    let width = match code {
+                        0x00 ..= 0x7F => unreachable!(),
+                        0x80 ..= 0x07FF => 2,
+                        0x0800 ..= 0xFFFF => 3,
+                        0x10000 ..= 0x10FFFF => 4,
+                        _ => unreachable!(),
+                    };
 
-                // if !decomposition.is_none() {
-                //     // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
-                //     let width = match code {
-                //         0x00 ..= 0x7F => unreachable!(),
-                //         0x80 ..= 0x07FF => 2,
-                //         0x0800 ..= 0xFFFF => 3,
-                //         0x10000 ..= 0x10FFFF => 4,
-                //         _ => unreachable!(),
-                //     };
+                    // если мы получили какую-то последовательность обычных стартеров:
+                    //  - комбинируем буфер, предшествующий отрезку стартеров
+                    //  - сливаем отрезок от брейкпоинта до предыдущего символа
 
-                //     // если мы получили какую-то последовательность символов без декомпозиции:
-                //     //  - сливаем буфер предшествующих этому отрезку не-стартеров
-                //     //  - сливаем отрезок от брейкпоинта до предыдущего символа
+                    if !iter.at_breakpoint(width) {
+                        combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
+                        write_str!(result, iter.block_slice(width));
+                    }
 
-                //     if !iter.at_breakpoint(width) {
-                //         flush!(result, buffer);
-                //         write_str!(result, iter.block_slice(width));
-                //     }
+                    // TODO: если декомпозиция начинается с нестартера, то для композиции ей потребуется
+                    // предыдущий элемент. это два случая: DecompositionValue::NonStarter и частный случай Expansion
+                    // декомпозиции на нестартеры
 
-                //     break (decomposition, code);
-                // }
+                    break (decomposition, code);
+                }
             };
 
             // помним, что стартеры могут быть скомбинированы с предыдущими кодпоинтами в большинстве случаев,

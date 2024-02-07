@@ -33,6 +33,16 @@ pub enum DecompositionValue
     Hangul(HangulVT),
 }
 
+impl DecompositionValue
+{
+    /// обычный стартер?
+    #[inline(always)]
+    pub fn is_none(&self) -> bool
+    {
+        matches!(self, DecompositionValue::None(_))
+    }
+}
+
 /// парсим значение из таблицы
 #[inline(always)]
 pub fn parse_data_value(value: u64) -> DecompositionValue
