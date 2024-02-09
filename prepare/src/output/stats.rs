@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-/// информация о данных декомпозиции
+/// информация о данных
 pub fn print(
     filename: &str,
     index: &[u32],
     data: &[u64],
     expansions: &[u32],
-    dec_starts_at: u32,
+    compositions: &[u64],
     stats: HashMap<String, usize>,
 )
 {
@@ -15,14 +15,14 @@ pub fn print(
         размер индекса: {}\n  \
         размер блока данных: {}\n  \
         размер дополнительных данных: {}\n  \
-        общий размер: {}\n  \
-        декомпозиция начинается с 0x{:04X}",
+        композиции: {}\n  \
+        общий размер: {}\n",
         filename,
         index.len(),
         data.len() * 8,
         expansions.len() * 4,
-        index.len() + (data.len() * 8) + (expansions.len() * 4),
-        dec_starts_at,
+        compositions.len() * 8,
+        index.len() + (data.len() * 8) + (expansions.len() * 4) + (compositions.len() * 8)
     );
 
     println!();

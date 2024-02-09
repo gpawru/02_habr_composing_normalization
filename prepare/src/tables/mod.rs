@@ -1,11 +1,10 @@
-mod compositions;
 use std::collections::HashMap;
 
-pub use compositions::*;
-
-use unicode_normalization_source::UNICODE;
+mod compositions;
 
 use crate::encode::encode_codepoint;
+pub use compositions::*;
+use unicode_normalization_source::UNICODE;
 
 /// до этого кодпоинта (включительно) все кодпоинты записаны в таблицу данных последовательно
 pub const CONTINUOUS_BLOCK_END: u32 = 0xFFF;

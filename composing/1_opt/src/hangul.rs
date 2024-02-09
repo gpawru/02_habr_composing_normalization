@@ -48,28 +48,30 @@ pub fn is_hangul_vt(code: u32) -> Option<HangulVT>
 {
     let v = code.wrapping_sub(HANGUL_V_BASE);
 
-    if v < HANGUL_VT_JAMO_COUNT {
-        if v < HANGUL_V_COUNT {
-            return Some(HangulVT::Vowel(v));
-        }
-
-        let t = v.wrapping_sub(HANGUL_T_BASE - HANGUL_V_BASE);
-
-        return match t < HANGUL_T_COUNT {
-            true => Some(HangulVT::TrailingConsonant(t)),
-            false => None,
-        };
+    if v >= HANGUL_VT_JAMO_COUNT {
+        return None;
     }
 
-    None
+    // if v < HANGUL_VT_JAMO_COUNT {
+    if v < HANGUL_V_COUNT {
+        return Some(HangulVT::Vowel(v));
+    }
+
+    let t = v.wrapping_sub(HANGUL_T_BASE - HANGUL_V_BASE);
+
+    match t < HANGUL_T_COUNT {
+        true => Some(HangulVT::TrailingConsonant(t)),
+        false => None,
+    }
+    // }
+
+    // None
 }
 
 /// скомбинировать и записать кодпоинт хангыль, предполагается, что в буфере один кодпоинт
 #[inline(always)]
-pub fn combine_and_write_hangul_vt(buffer: &mut Vec<Codepoint>, result: &mut String, vt: HangulVT)
+pub fn combine_and_write_hangul_vt(code: u32, result: &mut String, vt: HangulVT)
 {
-    let code = buffer[0].code;
-
     match vt {
         HangulVT::Vowel(v) => {
             let l = code.wrapping_sub(HANGUL_L_BASE);
@@ -78,13 +80,11 @@ pub fn combine_and_write_hangul_vt(buffer: &mut Vec<Codepoint>, result: &mut Str
                 true => {
                     let lv = HANGUL_S_BASE + l * HANGUL_N_COUNT + v * HANGUL_T_BLOCK_SIZE;
 
-                    buffer[0].code = lv;
+                    write!(result, lv);
                 }
                 false => {
                     write!(result, code);
                     write!(result, HANGUL_V_BASE + v);
-
-                    buffer.clear();
                 }
             }
         }
@@ -100,8 +100,6 @@ pub fn combine_and_write_hangul_vt(buffer: &mut Vec<Codepoint>, result: &mut Str
                     write!(result, HANGUL_T_BASE + t);
                 }
             }
-
-            buffer.clear();
         }
     }
 }

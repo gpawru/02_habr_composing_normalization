@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use unicode_normalization_prepare::encode::{encode_codepoint, MARKER_SINGLETON, MARKER_STARTER};
+use unicode_normalization_prepare::encode::*;
 use unicode_normalization_source::{
     properties::Codepoint, COMPOSITION_EXCLUSIONS, COMPOSITION_PAIRS, NFC, NFKC, UNICODE,
 };
@@ -37,7 +37,7 @@ fn nfc_start()
     let mut first_com = 0;
     let mut first_dec = 0;
 
-    for code in 0u32 ..= 0x7FFF {
+    for code in 0u32 ..= 0xFFF {
         if code % 32 == 0 {
             print!("\n{:04X} ", (code / 32) * 32);
         }
@@ -48,7 +48,7 @@ fn nfc_start()
 
                 let encoded = encode_codepoint(codepoint, true, 0, &mut stats);
 
-                match (encoded.value as u8) as u64 {
+                match (encoded.value as u8 & 0b_1111) as u64 {
                     MARKER_STARTER => '.',
                     MARKER_SINGLETON => {
                         if first_com == 0 {
@@ -56,6 +56,20 @@ fn nfc_start()
                         };
                         's'
                     }
+                    MARKER_PAIR => '_',
+                    MARKER_NONSTARTER => {
+                        if first_dec == 0 {
+                            first_dec = code;
+                        }
+                        'n'
+                    }
+                    MARKER_EXPANSION_TWO_STARTERS_NONSTARTER => 'e',
+                    MARKER_EXPANSION_STARTER_NONSTARTERS => {
+                        let c = &NFC[&code];
+                        print!("{}", c.len());
+                        'q'
+                    }
+                    MARKER_EXPANSION_STARTERS => 's',
                     _ => {
                         if first_dec == 0 {
                             first_dec = code;

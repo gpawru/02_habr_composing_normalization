@@ -22,26 +22,19 @@ pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
         false => ("NFKC", 0xA0),
     };
 
-    let dec_starts_at = match canonical {
-        true => 0xC0,
-        false => 0xA0,
-    };
-
     let output = format!(
         "CompositionData {{\n  \
             index: &[{}  ],\n  \
             data: &[{}  ],\n  \
             expansions: &[{}  ],\n  \
             compositions: &[{} ],\n  \
-            continuous_block_end: 0x{:04X},\n  \
-            decompositions_start: 0x{:04X},\n\
+            continuous_block_end: 0x{:04X},\n\
         }}\n",
         format_num_vec(tables.index.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(tables.data.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(tables.expansions.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(COMPOSITION_TABLE_DATA.as_slice(), FORMAT_STRING_LENGTH),
         CONTINUOUS_BLOCK_END,
-        dec_starts_at
     );
 
     write!(file, "{}", output).unwrap();
@@ -51,7 +44,7 @@ pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
         tables.index.as_slice(),
         tables.data.as_slice(),
         tables.expansions.as_slice(),
-        dec_starts_at,
+        COMPOSITION_TABLE_DATA.as_slice(),
         stats,
     );
     println!(

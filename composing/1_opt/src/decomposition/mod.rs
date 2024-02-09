@@ -8,13 +8,13 @@ use crate::Expansion;
 pub const LAST_DECOMPOSITION_CODE: u32 = 0x2FA1D;
 
 /// стартер без декомпозиции
-const MARKER_STARTER: u8 = 0;
+pub const MARKER_STARTER: u8 = 0;
+/// пара стартер-нестартер
+pub const MARKER_PAIR: u8 = 0b_001;
 /// стартер-синглтон
-const MARKER_SINGLETON: u8 = 0b_001;
+pub const MARKER_SINGLETON: u8 = 0b_010;
 /// нестартер без декомпозиции
-const MARKER_NONSTARTER: u8 = 0b_010;
-/// 16-битная пара (стартер-нестартер)
-const MARKER_PAIR: u8 = 0b_011;
+pub const MARKER_NONSTARTER: u8 = 0b_011;
 
 #[derive(Debug)]
 pub enum DecompositionValue
@@ -33,57 +33,54 @@ pub enum DecompositionValue
     Hangul(HangulVT),
 }
 
-impl DecompositionValue
-{
-    /// обычный стартер?
-    #[inline(always)]
-    pub fn is_none(&self) -> bool
-    {
-        matches!(self, DecompositionValue::None(_))
-    }
-}
-
 /// парсим значение из таблицы
 #[inline(always)]
 pub fn parse_data_value(value: u64) -> DecompositionValue
 {
-    match value as u8 {
+    match value as u8 & 0b_111 {
         MARKER_STARTER => parse_starter(value),
+        MARKER_PAIR => parse_pair(value),
         MARKER_SINGLETON => parse_singleton(value),
         MARKER_NONSTARTER => parse_nonstarter(value),
-        MARKER_PAIR => parse_pair(value),
         _ => parse_expansion(value),
     }
 }
 
 /// стартер без декомпозиции
 #[inline(always)]
-fn parse_starter(value: u64) -> DecompositionValue
+pub fn parse_starter(value: u64) -> DecompositionValue
 {
-    DecompositionValue::None(o!(value, Combining, 1))
+    DecompositionValue::None(parse_starter_value(value))
+}
+
+/// стартер без декомпозиции
+#[inline(always)]
+pub fn parse_starter_value(value: u64) -> Combining
+{
+    o!(value, Combining, 1)
 }
 
 /// нестартер без декомпозиции (например, диакретический знак)
 #[inline(always)]
 fn parse_nonstarter(value: u64) -> DecompositionValue
 {
-    DecompositionValue::NonStarter(o!(value, u8, 1))
+    DecompositionValue::NonStarter((value >> 4) as u8)
 }
 
-/// 16-битная пара (стартер-нестартер)
+/// пара стартер-нестартер
 #[inline(always)]
-fn parse_pair(value: u64) -> DecompositionValue
+pub fn parse_pair(value: u64) -> DecompositionValue
 {
     DecompositionValue::Pair(
         Codepoint {
-            code: o!(value, u16, 2) as u32,
+            code: ((value >> 12) & 0x3FFFF) as u32,
             ccc: 0,
         },
         Codepoint {
-            code: o!(value, u16, 3) as u32,
-            ccc: o!(value, u8, 1),
+            code: ((value >> 30) & 0x3FFFF) as u32,
+            ccc: (value >> 4) as u8,
         },
-        o!(value, Combining, 1),
+        o!(value, Combining, 3),
     )
 }
 

@@ -1,6 +1,7 @@
+use icu_normalizer::ComposingNormalizer;
 use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
 
-use unicode_composing_v0::ComposingNormalizer as v0;
+use unicode_composing_v1::ComposingNormalizer as v1;
 // use unicode_composing_v1::ComposingNormalizer as v1;
 // use unicode_composing_v2::DecomposingNormalizer as v2;
 
@@ -14,6 +15,24 @@ macro_rules! test {
             $test.description
         );
     };
+}
+
+#[test]
+fn foo()
+{
+    let normalizer = v1::nfc();
+
+    // 1100 AC00 11A8;1100 AC01;1100 1100 1161 11A8;1100 AC01;1100 1100 1161 11A8; # (ᄀ각; ᄀ각; ᄀ각; ᄀ각; ᄀ각; ) HANGUL CHOSEONG KIYEOK, HANGUL SYLLABLE GA, HANGUL JONGSEONG KIYEOK
+    // 0374;02B9;02B9;02B9;02B9; # (ʹ; ʹ; ʹ; ʹ; ʹ; ) GREEK NUMERAL SIGN
+    // 0958;0915 093C;0915 093C;0915 093C;0915 093C; # (क़; क◌़; क◌़; क◌़; क◌़; ) DEVANAGARI LETTER QA
+    // 212B;00C5;0041 030A;00C5;0041 030A; # (Å; Å; A◌̊; Å; A◌̊; ) ANGSTROM SIGN
+    let source = "\u{212b}";
+
+    let result = normalizer.normalize(source);
+
+    for char in result.chars() {
+        print!("{:04X} ", u32::from(char));
+    }
 }
 
 /// тесты NFC нормализации из UCD
@@ -41,7 +60,7 @@ fn ucd_test_nfc()
         };
     }
 
-    test_group!(v0::nfc());
+    test_group!(v1::nfc());
 }
 
 /// тесты NFKC нормализации из UCD
@@ -68,5 +87,5 @@ fn ucd_test_nfkc()
         };
     }
 
-    test_group!(v0::nfkc());
+    test_group!(v1::nfkc());
 }

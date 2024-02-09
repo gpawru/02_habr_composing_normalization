@@ -16,7 +16,7 @@ const MARKER_EXPANSION_TWO_STARTERS_NONSTARTER: u8 = 0b_110;
 /// исключения - стартеры, которые декомпозируются в нестартеры
 const MARKER_EXPANSION_NONSTARTERS_EXCLUSION: u8 = 0b_111;
 /// исключения - стартеры, которые комбинируются с предыдущими кодпоинтами
-const MARKER_EXPANSION_COMBINES_BACKWARDS: u8 = 0b_1000;
+const MARKER_EXPANSION_COMBINES_BACKWARDS: u8 = 0b_1100;
 
 /// информация о данных, вынесенных в отдельный блок
 #[derive(Debug)]
