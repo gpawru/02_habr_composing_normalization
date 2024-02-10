@@ -4,6 +4,46 @@ use std::{collections::HashMap, fs};
 use unicode_normalization_prepare::encode::encode_codepoint;
 use unicode_normalization_source::UNICODE;
 
+// что не так с чешским?
+#[test]
+fn test_czech()
+{
+    let files = files();
+    let (_, text) = files.iter().find(|(name, _)| name == "czech").unwrap();
+    let mut stats = HashMap::new();
+
+    let mut chars: HashMap<u32, (usize, u64)> = HashMap::new();
+
+    for char in text.chars() {
+    
+        let code = u32::from(char);
+        let codepoint = &UNICODE.get(&code).unwrap();
+        let encoded = encode_codepoint(codepoint, true, 0, &mut stats);
+
+        chars.entry(code).and_modify(|c| c.0 += 1).or_insert((0, encoded.value));
+    }
+
+    let mut keys: Vec<&u32> = chars.keys().collect();
+    keys.sort();
+
+    for code in keys {
+        let count = chars[code].0;
+        let value = chars[code].1;
+
+        if value & 1 != 0 {
+            panic!();
+        }
+
+        let marker = (value as u8 >> 1) & 0b_111;
+
+        if marker != 1 {
+            continue;
+        }
+
+        println!("{} - {:04X} - {}", char::from_u32(*code).unwrap(), code, count);
+    }    
+}
+
 /// поймём, в чём причина просадок для определенных языков
 #[test]
 fn test_languages()

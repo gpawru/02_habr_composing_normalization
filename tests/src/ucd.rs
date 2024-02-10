@@ -22,17 +22,17 @@ fn foo()
 {
     let normalizer = v1::nfc();
 
-    // 1100 AC00 11A8;1100 AC01;1100 1100 1161 11A8;1100 AC01;1100 1100 1161 11A8; # (ᄀ각; ᄀ각; ᄀ각; ᄀ각; ᄀ각; ) HANGUL CHOSEONG KIYEOK, HANGUL SYLLABLE GA, HANGUL JONGSEONG KIYEOK
-    // 0374;02B9;02B9;02B9;02B9; # (ʹ; ʹ; ʹ; ʹ; ʹ; ) GREEK NUMERAL SIGN
-    // 0958;0915 093C;0915 093C;0915 093C;0915 093C; # (क़; क◌़; क◌़; क◌़; क◌़; ) DEVANAGARI LETTER QA
-    // 212B;00C5;0041 030A;00C5;0041 030A; # (Å; Å; A◌̊; Å; A◌̊; ) ANGSTROM SIGN
-    let source = "\u{212b}";
+    // 00A0;00A0;00A0;0020;0020; # ( ;  ;  ;  ;  ; ) NO-BREAK SPACE
+// 137438953477
+    let source = "\u{00A0}";
 
     let result = normalizer.normalize(source);
 
+    println!();
     for char in result.chars() {
         print!("{:04X} ", u32::from(char));
     }
+    println!();
 }
 
 /// тесты NFC нормализации из UCD
@@ -50,6 +50,8 @@ fn ucd_test_nfc()
                 let normalizer = $normalizer;
 
                 for t in tests {
+                    // println!("{} - {}", t.line, t.description);
+
                     test!(t.c2, t.c1, normalizer, t, "{} {}: c2 == toNFC(c1)");
                     test!(t.c2, t.c2, normalizer, t, "{} {}: c2 == toNFC(c2)");
                     test!(t.c2, t.c3, normalizer, t, "{} {}: c2 == toNFC(c3)");

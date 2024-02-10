@@ -10,25 +10,25 @@ pub const MARKER_STARTER: u64 = 0b_000;
 /// пара стартер + нестартер
 pub const MARKER_PAIR: u64 = 0b_001;
 /// стартер-синглтон
-pub const MARKER_SINGLETON: u64 = 0b_100;
+pub const MARKER_SINGLETON: u64 = 0b_010;
 /// нестартер без декомпозиции
-pub const MARKER_NONSTARTER: u64 = 0b_111;
+pub const MARKER_NONSTARTER: u64 = 0b_011;
 
-/// последовательность стартеров:
-///  - первый стартер не комбинируется с предыдущими кодпоинтами
-///  - информация о комбинировании записана для последнего стартера последовательности
-pub const MARKER_EXPANSION_STARTERS: u64 = 0b_0100;
+// 4 маркера объединены в один кейс: 0 или несколько стартеров + 0 или несколько нестартеров
+//  - первый стартер не комбинируется с предыдущими кодпоинтами
+//  - информация о комбинировании записана для последнего стартера последовательности
+
 /// стартер и не-стартеры
-///  - стартер не комбинируется с предыдущими кодпоинтами
-pub const MARKER_EXPANSION_STARTER_NONSTARTERS: u64 = 0b_101;
+pub const MARKER_EXPANSION_STARTER_NONSTARTERS: u64 = 0b_100;
+/// последовательность стартеров
+pub const MARKER_EXPANSION_STARTERS: u64 = 0b_0100;
 /// два стартера + нестартер
-///  - первый стартер не комбинируется с предыдущими кодпоинтами
-///  - информация о комбинировании записана для второго стартера
-pub const MARKER_EXPANSION_TWO_STARTERS_NONSTARTER: u64 = 0b_110;
+pub const MARKER_EXPANSION_TWO_STARTERS_NONSTARTER: u64 = 0b_100;
 /// исключения - стартеры, которые декомпозируются в нестартеры
-pub const MARKER_EXPANSION_NONSTARTERS_EXCLUSION: u64 = 0b_111;
+pub const MARKER_NONSTARTERS_EXCLUSION: u64 = 0b_100;
+
 /// исключения - стартеры, которые комбинируются с предыдущими кодпоинтами
-pub const MARKER_EXPANSION_COMBINES_BACKWARDS: u64 = 0b_111;
+pub const MARKER_COMBINES_BACKWARDS: u64 = 0b_101;
 
 #[derive(Debug, Clone)]
 pub struct EncodedCodepoint
@@ -53,7 +53,7 @@ pub fn encode_codepoint(
     };
 
     if is_composable_hangul_jamo(codepoint.code) {
-        quick_check = 'H';
+        quick_check = 'M';
     }
 
     let variants = &[
@@ -96,6 +96,7 @@ pub fn encode_codepoint(
 //
 // pp.. - (16 бит) - индекс последовательности кодпоинтов в таблице expansions
 // nn.. - (8 бит) - количество кодпоинтов в последовательности в таблице expansions
+// tttt - (4 бита) - количество нестартеров в последовательности в таблице expansions
 
 macro_rules! blocking_checks {
     ($($expr: expr),+) => {
@@ -113,8 +114,13 @@ macro_rules! combining {
 
 macro_rules! assert_not_combines_backwards {
     ($code: expr) => {
-        // стартер у пары не комбинируется с предыдущими кодпоинтами
         assert!(!COMBINES_BACKWARDS.contains_key(&($code as u32)));
+    };
+}
+
+macro_rules! assert_qc {
+    ($qc: expr, $($c:expr),+) => {
+        assert!([$($c),+].contains(&$qc));
     };
 }
 
@@ -127,8 +133,10 @@ macro_rules! to_stats {
 macro_rules! encoded {
     ($marker: expr, $qc: expr, $data: expr, $expansion: expr) => {{
         let qc = match $qc {
-            'Y' | 'M' => 0,
-            _ => 1,
+            'Y' => 0,
+            'N' => 1,
+            'M' => 1,
+            _ => unreachable!(),
         };
 
         Some(EncodedCodepoint {
@@ -139,7 +147,7 @@ macro_rules! encoded {
 }
 
 macro_rules! expansion_entry {
-    ($marker: expr, $qc: expr, $combining: expr, $precomposition: expr, $e_index: expr) => {{
+    ($marker: expr, $fast: expr, $combining: expr, $precomposition: expr, $e_index: expr) => {{
         let e_index = $e_index as u64;
         let e_len = $precomposition.len() as u64;
 
@@ -156,10 +164,14 @@ macro_rules! expansion_entry {
             }
         }
 
+        let n_len = $precomposition.iter().filter(|c| c.is_nonstarter()).count() as u64;
+
+        assert!(n_len < 0b_1111);
+
         encoded!(
             $marker,
-            $qc,
-            ($combining << 32) | (e_index << 16) | (e_len << 8),
+            $fast,
+            ($combining << 32) | (e_index << 16) | (e_len << 8) | (n_len << 4),
             Some(prepare_expansion_data($precomposition))
         )
     }};
@@ -185,6 +197,10 @@ fn starter(
         combines_backwards(codepoint.code)
     );
 
+    // Y - если за стартером следует стартер, то кодпоинт не изменится
+    // M - чамо хангыль V / T - нужно попробовать скомбинировать с предыдущим кодпоинтом
+    assert_qc!(qc, 'Y', 'M');
+
     to_stats!(stats, "стартер");
 
     encoded!(MARKER_STARTER, qc, combining!(codepoint.code) << 16, None)
@@ -209,7 +225,11 @@ fn starter_nonstarter_pair(
         is_exclusion(codepoint.code)
     );
 
-    to_stats!(stats, "пара стартер + нестартер");
+    // Y - пара будет скомбинирована обратно, если за ней следет стартер
+    // N - при комбинировании будет получен другой символ
+    assert_qc!(qc, 'Y', 'N');
+
+    to_stats!(stats, "пара - стартер + нестартер");
 
     let c0 = precomposition[0].code as u64;
     let c1 = precomposition[1].code as u64;
@@ -238,6 +258,9 @@ fn singleton(
 ) -> Option<EncodedCodepoint>
 {
     blocking_checks!(starters_map(precomposition) != "s");
+
+    // N - синглтон - это всегда замена одного кодпоинта другим
+    assert_qc!(qc, 'N');
 
     to_stats!(stats, "синглтон");
 
@@ -268,16 +291,21 @@ fn nonstarter(
 {
     blocking_checks!(!precomposition.is_empty(), codepoint.is_starter());
 
+    // M, Y - нестартеры делятся на те, которые могут быть скомбинированы, и на те, которые не могут
+    // тем не менее, будем рассматривать любой нестартер как N, т.к. мы в данном случае не используем
+    // непосредственно алгоритм валидации NF(K)C, а его часть
+    assert_qc!(qc, 'Y', 'M');
+
     to_stats!(stats, "нестартер");
 
     let ccc = codepoint.ccc.u8() as u64;
 
-    encoded!(MARKER_NONSTARTER, qc, (ccc << 4), None)
+    encoded!(MARKER_NONSTARTER, 'N', (ccc << 4), None)
 }
 
 /// последовательность стартеров
 ///
-/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  cccc mmmq
+/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  0000 mmmq
 ///
 fn starters_sequence(
     _: &Codepoint,
@@ -291,6 +319,9 @@ fn starters_sequence(
         precomposition.len() < 2,
         !precomposition.iter().all(|c| c.is_starter())
     );
+
+    // N - декомпозиция происходит всегда
+    assert_qc!(qc, 'N');
 
     to_stats!(stats, "последовательности стартеров");
 
@@ -307,7 +338,7 @@ fn starters_sequence(
 
 /// стартер и последовательность нестартеров
 ///
-/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  cccc mmmq
+/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  tttt mmmq
 ///
 fn starter_nonstarters_sequence(
     _: &Codepoint,
@@ -322,6 +353,9 @@ fn starter_nonstarters_sequence(
         !precomposition[0].is_starter(),
         !precomposition[1 ..].iter().all(|c| c.is_nonstarter())
     );
+
+    // Y, N - аналогично паре
+    assert_qc!(qc, 'Y', 'N');
 
     to_stats!(stats, "стартер + нестартеры");
 
@@ -338,7 +372,7 @@ fn starter_nonstarters_sequence(
 
 /// стартер + стартер + нестартер
 ///
-/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  cccc mmmq
+/// ____ ____  ____ ____    iiii iiii  iiii iiii    pppp pppp  pppp pppp    nnnn nnnn  tttt mmmq
 ///
 fn two_starters_nonstarter(
     _: &Codepoint,
@@ -349,6 +383,9 @@ fn two_starters_nonstarter(
 ) -> Option<EncodedCodepoint>
 {
     blocking_checks!(starters_map(precomposition) != "ssn");
+
+    // N - только в NFKC - декомпозиция происходит всегда
+    assert_qc!(qc, 'N');
 
     to_stats!(stats, "два стартера + нестартер");
 
@@ -365,10 +402,10 @@ fn two_starters_nonstarter(
 
 /// исключение - стартеры с декомпозицией в нестартеры
 ///
-/// ____ ____  ____ ____    ____ ____  ____ ____    pppp pppp  pppp pppp    nnnn nnnn  cccc mmmq
+/// ____ ____  ____ ____    ____ ____  ____ ____    pppp pppp  pppp pppp    nnnn nnnn  tttt mmmq
 ///
 fn starters_to_nonstarters(
-    codepoint: &Codepoint,
+    _: &Codepoint,
     precomposition: &Vec<Codepoint>,
     qc: char,
     expansion_table_position: usize,
@@ -380,10 +417,13 @@ fn starters_to_nonstarters(
         !precomposition.iter().all(|c| c.is_nonstarter())
     );
 
+    // N - т.к. кодпоинт всегда декомпозируется и не собирается обратно
+    assert_qc!(qc, 'N');
+
     to_stats!(stats, "декомпозиция в нестартеры");
 
     expansion_entry!(
-        MARKER_EXPANSION_NONSTARTERS_EXCLUSION,
+        MARKER_NONSTARTERS_EXCLUSION,
         qc,
         0,
         precomposition,
@@ -393,13 +433,13 @@ fn starters_to_nonstarters(
 
 /// исключение - стартеры, комбинируемые с предыдущим кодпоинтом
 ///
-/// ____ ____  ____ ____    iiii iiii  iiii iiii    ____ ____  ____ ____    ____ ____  cccc mmmq
+/// ____ ____  ____ ____    ____ ____  ____ ____    iiii iiii  iiii iiii    ____ ____  ____ mmmq
 ///
 fn combines_backwards_case(
     codepoint: &Codepoint,
     precomposition: &Vec<Codepoint>,
     qc: char,
-    expansion_table_position: usize,
+    _: usize,
     stats: &mut HashMap<String, usize>,
 ) -> Option<EncodedCodepoint>
 {
@@ -411,15 +451,14 @@ fn combines_backwards_case(
     assert_eq!(combining!(codepoint.code), 0);
     assert!(precomposition.is_empty());
 
+    // M - может быть скомбинирован с предыдущим или оставлен как есть
+    assert_qc!(qc, 'M');
+
     to_stats!(stats, "комбинируется с предыдущим");
 
-    expansion_entry!(
-        MARKER_EXPANSION_COMBINES_BACKWARDS,
-        qc,
-        combination_backwards_info(codepoint.code) as u64,
-        precomposition,
-        expansion_table_position
-    )
+    let combines = combination_backwards_info(codepoint.code) as u64;
+
+    encoded!(MARKER_COMBINES_BACKWARDS, qc, (combines << 16), None)
 }
 
 /// строка, описывающая прекомпозицию, состоящая из символов s и n, где s - стартер, n - нестартер

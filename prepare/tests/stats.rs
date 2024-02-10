@@ -46,36 +46,12 @@ fn nfc_start()
             Some(codepoint) => {
                 let mut stats = HashMap::new();
 
-                let encoded = encode_codepoint(codepoint, true, 0, &mut stats);
+                let encoded = encode_codepoint(codepoint, false, 0, &mut stats);
 
-                match (encoded.value as u8 & 0b_1111) as u64 {
-                    MARKER_STARTER => '.',
-                    MARKER_SINGLETON => {
-                        if first_com == 0 {
-                            first_com = code;
-                        };
-                        's'
-                    }
-                    MARKER_PAIR => '_',
-                    MARKER_NONSTARTER => {
-                        if first_dec == 0 {
-                            first_dec = code;
-                        }
-                        'n'
-                    }
-                    MARKER_EXPANSION_TWO_STARTERS_NONSTARTER => 'e',
-                    MARKER_EXPANSION_STARTER_NONSTARTERS => {
-                        let c = &NFC[&code];
-                        print!("{}", c.len());
-                        'q'
-                    }
-                    MARKER_EXPANSION_STARTERS => 's',
-                    _ => {
-                        if first_dec == 0 {
-                            first_dec = code;
-                        }
-                        'd'
-                    }
+                match (encoded.value as u8 & 0b_1) as u64 {
+                    1 => '+',
+                    0 => '.',
+                    _ => unreachable!()
                 }
             }
             None => '.',

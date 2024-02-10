@@ -7,13 +7,13 @@ edition = "2021"
 criterion = "0.5.1"
 icu_normalizer = "1.4.1"
 
-unicode_composing_v0 = { path = "./../composing/0_base" }
+# unicode_composing_v0 = { path = "./../composing/0_base" }
 unicode_composing_v1 = { path = "./../composing/1_opt" }
 
-[[bench]]
-name = "v0"
-path = "benches/v0.rs"
-harness = false
+# [[bench]]
+# name = "v0"
+# path = "benches/v0.rs"
+# harness = false
 
 [[bench]]
 name = "v1"

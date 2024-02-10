@@ -1,3 +1,5 @@
+pub mod decode;
+
 /// кодпоинт
 #[derive(Debug, Clone, Copy)]
 pub struct Codepoint

@@ -1,20 +1,18 @@
+use codepoint::decode::{is_nonstarters_value, parse_data_value, DecodedValue};
 use codepoint::Codepoint;
 use composition::*;
-use decomposition::*;
-use expansion::*;
-use hangul::*;
 use slice::aligned::Aligned;
 use slice::iter::CharsIter;
 
 mod codepoint;
 mod composition;
 mod data;
-mod decomposition;
-mod expansion;
-mod hangul;
 mod macros;
 mod slice;
 mod utf8;
+
+/// последний кодпоинт таблицы с декомпозицией
+const LAST_DECOMPOSITION_CODE: u32 = 0x2FA1D;
 
 /// нормализатор NF(K)C
 #[repr(align(128))]
@@ -30,8 +28,6 @@ pub struct ComposingNormalizer<'a>
     pub compositions: Aligned<'a, u64>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     pub continuous_block_end: u32,
-    /// до этого кодпоинта все кодпоинты - стартеры (0xC0/0xA0)
-    pub decompositions_start: u32,
 }
 
 impl<'a> From<data::CompositionData<'a>> for ComposingNormalizer<'a>
@@ -44,9 +40,164 @@ impl<'a> From<data::CompositionData<'a>> for ComposingNormalizer<'a>
             expansions: Aligned::from(source.expansions),
             compositions: Aligned::from(source.compositions),
             continuous_block_end: source.continuous_block_end,
-            decompositions_start: source.decompositions_start,
         }
     }
+}
+
+macro_rules! normalization_method {
+    ($method: ident, $bound: expr, $bound_first_byte: expr) => {
+        #[inline(never)]
+        pub fn $method(&self, input: &str) -> String
+        {
+            let mut result = String::with_capacity(input.len());
+            let mut buffer: Vec<Codepoint> = Vec::with_capacity(18);
+            let mut combining = Combining::None;
+
+            macro_rules! combine {
+                () => {
+                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
+                };
+            }
+            macro_rules! to_buffer {
+                ($codepoint: expr) => {
+                    buffer.push($codepoint);
+                };
+                ($code: expr, $ccc: expr) => {
+                    buffer.push(Codepoint {
+                        ccc: $ccc,
+                        code: $code,
+                    })
+                };
+            }
+
+            let iter = &mut CharsIter::new(input);
+
+            loop {
+                iter.set_breakpoint();
+
+                let (data_value, code) = loop {
+                    // всё прочитали - комбинируем предшествующий текущему отрезку буфер, дописываем остаток
+                    if iter.is_empty() {
+                        combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
+                        write_str!(result, iter.ending_slice());
+
+                        return result;
+                    }
+
+                    let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+
+                    // текст, состоящий только из ASCII-символов уже NF(KC) нормализован
+                    // учитывая то, что для NFC и NFKC символы до U+0300 и U+00A0 соответственно также нормализованы,
+                    // используем не 0x80 в качестве границы, а значение первого байта UTF-8 вышеуказанных символов.
+                    if first < $bound_first_byte || first >> 6 == 0b_10 {
+                        continue;
+                    }
+
+                    let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+
+                    if code > LAST_DECOMPOSITION_CODE {
+                        continue;
+                    }
+
+                    let data_value = self.get_data_value(code);
+
+                    // является ли кодпоинт нормализованым? если - "да" или "возможно" (он считается
+                    // нормализованным, если за ним идёт стартер) - продолжаем быстрый цикл
+                    if data_value as u8 & 1 == 0 {
+                        continue;
+                    }
+
+                    // выходим из быстрого цикла, т.к. мы столкнулись с ситуацией, когда требуется
+                    // декомпозиция / комбинирование
+
+                    // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
+                    let width = match code {
+                        0x00 ..= 0x7F => unreachable!(),
+                        0x80 ..= 0x07FF => 2,
+                        0x0800 ..= 0xFFFF => 3,
+                        0x10000 ..= 0x10FFFF => 4,
+                        _ => unreachable!(),
+                    };
+
+                    // если у нас есть последовательность кодпоинтов в быстром цикле - комбинируем предшествующие
+                    // ему кодпоинты буфера, дописываем полученное в результат
+                    if !iter.at_breakpoint(width) {
+                        combine!();
+                        write_str!(result, iter.block_slice(width));
+
+                        // в случае, если получили нестартер, нам потребуется предшествующий ему кодпоинт.
+                        // он может быть только стартером / парой / частным случаем расширения -
+                        // стартер + несколько нестартеров
+                        // (смотрим, какие метки быстрых проверок используются в каких типах кодирования таблицы)
+                        if is_nonstarters_value(data_value) {
+                            let previous = u32::from(result.pop().unwrap());
+                            combining = self.buffer_previous(&mut buffer, previous);
+                        }
+                    }
+
+                    break (data_value, code);
+                };
+
+                let decoded = parse_data_value(data_value);
+
+                match decoded {
+                    DecodedValue::Pair(starter, nonstarter, new_combining) => {
+                        combine!();
+                        to_buffer!(starter);
+                        to_buffer!(nonstarter);
+                        combining = new_combining;
+                    }
+                    DecodedValue::Nonstarter(ccc) => {
+                        to_buffer!(code, ccc);
+                    }
+                    DecodedValue::Singleton(code, new_combining) => {
+                        combine!();
+                        to_buffer!(code, 0);
+                        combining = new_combining;
+                    }
+                    DecodedValue::Starter(_) => {
+                        combine!();
+                        // в этот блок попадают только стартеры - чамо хангыль
+                        combine_and_write_hangul_vt(&mut result, code);
+                        combining = Combining::None;
+                    }
+
+                    DecodedValue::Expansion(new_combining, index, ns_len, len) => {
+                        let index = index as usize;
+                        let st_len = len - ns_len;
+                        let buffer_from = st_len.saturating_sub(1) as usize;
+
+                        let slice = &self.expansions[index .. index + len as usize];
+
+                        if st_len != 0 {
+                            combine!();
+                            combining = new_combining;
+
+                            if st_len > 1 {
+                                slice[.. buffer_from]
+                                    .iter()
+                                    .for_each(|c| write!(result, *c));
+                            }
+                        }
+
+                        slice[buffer_from ..].iter().for_each(|c| {
+                            to_buffer!(Codepoint::from_compressed(*c));
+                        });
+                    }
+                    DecodedValue::CombinesBackwards(backwards_combining) => {
+                        combining = combine_backwards(
+                            &mut buffer,
+                            &mut result,
+                            code,
+                            combining,
+                            backwards_combining,
+                            &self.compositions,
+                        );
+                    }
+                }
+            }
+        }
+    };
 }
 
 impl<'a> ComposingNormalizer<'a>
@@ -62,218 +213,70 @@ impl<'a> ComposingNormalizer<'a>
     {
         Self::from(data::nfkc())
     }
-
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
     #[inline(never)]
     pub fn normalize(&self, input: &str) -> String
     {
-        let mut result = String::with_capacity(input.len());
-        let mut buffer: Vec<Codepoint> = Vec::with_capacity(18);
-        let mut combining = Combining::None;
-
-        // варианты содержимого буфера:
-        //  - пустой
-        //  - стартер
-        //  - стартер + нестартер(ы)
-        //  - нестартер(ы)
-
-        // let decompositions_start = self.decompositions_start;
-
-        let iter = &mut CharsIter::new(input);
-
-        loop {
-            iter.set_breakpoint();
-
-            let (decomposition, code) = loop {
-                if iter.is_empty() {
-                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
-                    write_str!(result, iter.ending_slice());
-
-                    return result;
-                }
-
-                let first = unsafe { utf8::char_first_byte_unchecked(iter) };
-
-                // текст, состоящий только из ASCII-символов уже NF(KC) нормализован
-                if first < 0x80 {
-                    continue;
-                }
-
-                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
-
-                // символы в пределах границы блока символов, не имеющих декомпозиции
-                // TODO: объяснить почему? смотри карту - первый нестартер
-                if code < 0x300 {
-                    continue;
-                }
-
-                // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции, не комбинируются ни с чем
-                if code > LAST_DECOMPOSITION_CODE {
-                    continue;
-                };
-
-                // обычный кодпоинт - получаем данные из таблицы, хангыль - вычисляем алгоритмически
-                let decomposition_value = match is_hangul_vt(code) {
-                    None => self.get_decomposition_value(code),
-                    Some(value) => {
-                        // размер UTF-8 последовательности символа чамо
-                        let width = 3;
-
-                        if !iter.at_breakpoint(width) {
-                            combine_and_write(
-                                &mut buffer,
-                                &mut result,
-                                combining,
-                                &self.compositions,
-                            );
-                            write_str!(result, iter.block_slice(width));
-                        }
-
-                        break (DecompositionValue::Hangul(value), code);
-                    }
-                };
-
-                let marker = (decomposition_value as u8) & 0b_0111;
-
-                if marker > 1 {
-                    // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
-                    let width = match code {
-                        0x00 ..= 0x7F => unreachable!(),
-                        0x80 ..= 0x07FF => 2,
-                        0x0800 ..= 0xFFFF => 3,
-                        0x10000 ..= 0x10FFFF => 4,
-                        _ => unreachable!(),
-                    };
-
-                    // если мы получили какую-то последовательность обычных стартеров:
-                    //  - комбинируем буфер, предшествующий отрезку стартеров
-                    //  - сливаем отрезок от брейкпоинта до предыдущего символа
-                    //  - проверяем комбинирование
-
-                    if !iter.at_breakpoint(width) {
-                        combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
-                        write_str!(result, iter.block_slice(width));
-
-                        // если декомпозиция начинается с нестартера, то для композиции ей потребуется предыдущий элемент
-                        combining = self.buffer_previous(&mut buffer, &mut result);
-                    }
-
-                    let decomposition = parse_data_value(decomposition_value);
-
-                    break (decomposition, code);
-                }
-            };
-
-            // помним, что стартеры могут быть скомбинированы с предыдущими кодпоинтами в большинстве случаев,
-            // и этот кейс вынесен в отдельный блок (как редковстречаемый), чтобы уменьшить количество проверок в цикле
-
-            match decomposition {
-                DecompositionValue::None(_) => unreachable!(),
-                // пара стартер-нестартер
-                DecompositionValue::Pair(c0, c1, new_combining) => {
-                    // TODO: нужен ли теперь в кейсах этот комбайн?
-                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
-
-                    buffer.push(c0);
-                    buffer.push(c1);
-
-                    combining = new_combining;
-                }
-                // нестартер
-                DecompositionValue::NonStarter(ccc) => {
-                    buffer.push(Codepoint { code, ccc });
-                }
-                // синглтон
-                DecompositionValue::Singleton(code, new_combining) => {
-                    combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
-
-                    buffer.push(Codepoint { code, ccc: 0 });
-
-                    combining = new_combining;
-                }
-                // вынесенные во внешний блок декомпозиции
-                DecompositionValue::Expansion(expansion) => {
-                    combining = combine_expansion(
-                        &mut buffer,
-                        &mut result,
-                        code,
-                        combining,
-                        expansion,
-                        &self.compositions,
-                        &self.expansions,
-                    );
-                }
-                // гласная или завершающая согласная чамо хангыль
-                DecompositionValue::Hangul(vt) => {
-                    match result.pop() {
-                        Some(prev) => combine_and_write_hangul_vt(u32::from(prev), &mut result, vt),
-                        None => {
-                            write!(result, code)
-                        }
-                    }
-
-                    combining = Combining::None;
-                }
-            }
+        match self.get_data_value(0xA0) {
+            0 => self.normalize_nfc(input),
+            _ => self.normalize_nfkc(input),
         }
     }
 
-    // /// получить декомпозицию символа
-    // #[inline(always)]
-    // fn decompose(&self, code: u32) -> DecompositionValue
-    // {
-    //     // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции, не комбинируются ни с чем
-    //     if code > LAST_DECOMPOSITION_CODE {
-    //         return DecompositionValue::None(Combining::None);
-    //     };
+    normalization_method!(normalize_nfc, 0x0300, 0xCC);
+    normalization_method!(normalize_nfkc, 0x00A0, 0xC2);
 
-    //     // обычный кодпоинт - получаем данные из таблицы, хангыль - вычисляем алгоритмически
-    //     match is_hangul_vt(code) {
-    //         None => parse_data_value(self.get_decomposition_value(code)),
-    //         Some(value) => DecompositionValue::Hangul(value),
-    //     }
-    // }
-
-    /// данные о декомпозиции символа
+    /// данные о декомпозиции / композиции кодпоинта
     #[inline(always)]
-    fn get_decomposition_value(&self, code: u32) -> u64
+    fn get_data_value(&self, code: u32) -> u64
     {
-        match code <= self.continuous_block_end {
-            true => self.data[code as usize],
-            false => {
-                let block_index = (code >> 7) as usize;
-                let block = self.index[block_index] as usize;
+        if code <= self.continuous_block_end {
+            self.data[code as usize]
+        } else {
+            let block_index = (code >> 7) as usize;
+            let block = self.index[block_index] as usize;
 
-                let block_offset = block << 7;
-                let code_offset = ((code as u8) & 0x7F) as usize;
+            let block_offset = block << 7;
+            let code_offset = ((code as u8) & 0x7F) as usize;
 
-                let index = block_offset | code_offset;
+            let index = block_offset | code_offset;
 
-                self.data[index]
-            }
+            self.data[index]
         }
     }
 
-    /// вытащить из результата последний кодпоинт (он может быть стартером или парой), и записать его в буфер для комбинирования
-    #[inline(never)]
-    fn buffer_previous(&self, buffer: &mut Vec<Codepoint>, result: &mut String) -> Combining
+    /// записать в буфер декомпозицию (точнее, прекомпозицию) последнего полученного кодпоинта
+    /// для комбинирования с нестартером
+    #[inline]
+    fn buffer_previous(&self, buffer: &mut Vec<Codepoint>, code: u32) -> Combining
     {
-        let previous = u32::from(result.pop().unwrap());
-        let value = self.get_decomposition_value(previous);
+        let data_value = self.get_data_value(code);
 
-        match parse_data_value(value) {
-            DecompositionValue::None(combining) => {
-                buffer.push(Codepoint {
-                    code: previous,
-                    ccc: 0,
-                });
+        // стартер / пара / стартер + нестартеры
+        match parse_data_value(data_value) {
+            DecodedValue::Starter(combining) => {
+                buffer.push(Codepoint { code, ccc: 0 });
+                combining
+            }
+            DecodedValue::Pair(starter, nonstarter, combining) => {
+                buffer.push(starter);
+                buffer.push(nonstarter);
 
                 combining
             }
-            DecompositionValue::Pair(c0, c1, combining) => {
-                buffer.push(c0);
-                buffer.push(c1);
+            DecodedValue::Expansion(combining, index, _, len) => {
+                let index = index as usize;
+                let len = len as usize;
+
+                buffer.push(Codepoint {
+                    ccc: 0,
+                    code: self.expansions[index],
+                });
+
+                self.expansions[index + 1 .. index + len]
+                    .iter()
+                    .for_each(|c| buffer.push(Codepoint::from_compressed(*c)));
 
                 combining
             }

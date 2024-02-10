@@ -1,6 +1,7 @@
 use icu_normalizer::ComposingNormalizer as icu;
-use unicode_composing_v0::ComposingNormalizer as v0;
+// use unicode_composing_v0::ComposingNormalizer as v0;
 //use unicode_composing_v2::ComposingNormalizer as v2;
+use unicode_composing_v1::ComposingNormalizer as v1;
 
 /// сравниваем с результатами нормализации ICU
 #[test]
@@ -8,6 +9,8 @@ fn icu()
 {
     let icu_nfc = icu::new_nfc();
     let icu_nfkc = icu::new_nfkc();
+
+    icu_nfc.normalize("");
 
     macro_rules! test {
         ($(($n: ident,  $t: expr)),+) => {
@@ -35,5 +38,5 @@ fn icu()
         };
     }
 
-    test!((v0, "v0"));
+    test!((v1, "v1"));
 }

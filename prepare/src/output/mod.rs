@@ -12,14 +12,14 @@ mod stats;
 const FORMAT_STRING_LENGTH: usize = 120;
 
 /// пишем данные о декомпозиции
-pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
+pub fn write(canonical: bool, file: &mut File)
 {
     let mut stats = HashMap::new();
     let tables = crate::tables::prepare(canonical, &mut stats);
 
-    let (name, _) = match canonical {
-        true => ("NFC", 0xC0),
-        false => ("NFKC", 0xA0),
+    let name = match canonical {
+        true => "NFC",
+        false => "NFKC",
     };
 
     let output = format!(
@@ -28,7 +28,7 @@ pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
             data: &[{}  ],\n  \
             expansions: &[{}  ],\n  \
             compositions: &[{} ],\n  \
-            continuous_block_end: 0x{:04X},\n\
+            continuous_block_end: 0x{:04X},\n
         }}\n",
         format_num_vec(tables.index.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(tables.data.as_slice(), FORMAT_STRING_LENGTH),
@@ -46,9 +46,5 @@ pub fn write(canonical: bool, file: &mut File /* stats_file: &mut File */)
         tables.expansions.as_slice(),
         COMPOSITION_TABLE_DATA.as_slice(),
         stats,
-    );
-    println!(
-        "  размер блока композиций: {}",
-        COMPOSITION_TABLE_DATA.len() * 8
     );
 }
