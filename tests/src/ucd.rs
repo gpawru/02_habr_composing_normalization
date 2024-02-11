@@ -1,9 +1,5 @@
-use icu_normalizer::ComposingNormalizer;
+use unicode_composing::ComposingNormalizer as my;
 use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
-
-use unicode_composing_v1::ComposingNormalizer as v1;
-// use unicode_composing_v1::ComposingNormalizer as v1;
-// use unicode_composing_v2::DecomposingNormalizer as v2;
 
 macro_rules! test {
     ($left: expr, $right: expr, $normalizer: expr, $test: expr, $str: expr) => {
@@ -15,24 +11,6 @@ macro_rules! test {
             $test.description
         );
     };
-}
-
-#[test]
-fn foo()
-{
-    let normalizer = v1::nfc();
-
-    // 00A0;00A0;00A0;0020;0020; # ( ;  ;  ;  ;  ; ) NO-BREAK SPACE
-// 137438953477
-    let source = "\u{00A0}";
-
-    let result = normalizer.normalize(source);
-
-    println!();
-    for char in result.chars() {
-        print!("{:04X} ", u32::from(char));
-    }
-    println!();
 }
 
 /// тесты NFC нормализации из UCD
@@ -50,8 +28,6 @@ fn ucd_test_nfc()
                 let normalizer = $normalizer;
 
                 for t in tests {
-                    // println!("{} - {}", t.line, t.description);
-
                     test!(t.c2, t.c1, normalizer, t, "{} {}: c2 == toNFC(c1)");
                     test!(t.c2, t.c2, normalizer, t, "{} {}: c2 == toNFC(c2)");
                     test!(t.c2, t.c3, normalizer, t, "{} {}: c2 == toNFC(c3)");
@@ -62,7 +38,7 @@ fn ucd_test_nfc()
         };
     }
 
-    test_group!(v1::nfc());
+    test_group!(my::nfc());
 }
 
 /// тесты NFKC нормализации из UCD
@@ -89,5 +65,5 @@ fn ucd_test_nfkc()
         };
     }
 
-    test_group!(v1::nfkc());
+    test_group!(my::nfkc());
 }

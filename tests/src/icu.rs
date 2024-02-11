@@ -1,7 +1,5 @@
 use icu_normalizer::ComposingNormalizer as icu;
-// use unicode_composing_v0::ComposingNormalizer as v0;
-//use unicode_composing_v2::ComposingNormalizer as v2;
-use unicode_composing_v1::ComposingNormalizer as v1;
+use unicode_composing::ComposingNormalizer as my;
 
 /// сравниваем с результатами нормализации ICU
 #[test]
@@ -36,5 +34,5 @@ fn icu()
         };
     }
 
-    test!((v1, "v1"));
+    test!((my, "my"));
 }

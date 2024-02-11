@@ -4,6 +4,9 @@ use unicode_normalization_source::normalization::precomposition::hangul::is_comp
 use unicode_normalization_source::properties::Codepoint;
 use unicode_normalization_source::{COMPOSITION_PAIRS, NFC, NFKC, UNICODE};
 
+// может показаться, что подобные тесты избыточны, но именно благодаря им зачастую находятся не самые очевидные 
+// ошибки (пусть даже не в нашем репозитории :) ) - https://github.com/unicode-org/icu4x/pull/4530
+
 #[test]
 fn test_nfc()
 {
@@ -98,7 +101,6 @@ fn normalize_precomposed(precomposition: &[Codepoint], next: &Codepoint) -> Vec<
     }
 
     // не нашли стартер
-    // if last_starter == 0 && precomposition[0].is_nonstarter() {
     if precomposition[0].is_nonstarter() {
         let mut result = precomposition.to_vec();
         result.push(next.clone());
@@ -108,12 +110,11 @@ fn normalize_precomposed(precomposition: &[Codepoint], next: &Codepoint) -> Vec<
         }
 
         return result;
-
-        //panic!("не нашли стартер");
     }
 
     // возможен вариант, когда в предкомпозиции присутствует несколько стартеров - записываем
     // заранее скомбинированную часть в результат
+
     let mut result = precomposition[.. last_starter].to_vec();
 
     // последовательность из прекомпозиции и следующего за ней кодпоинта заканчиваются нестартерами - комбинируем

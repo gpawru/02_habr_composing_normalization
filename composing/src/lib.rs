@@ -45,7 +45,7 @@ impl<'a> From<data::CompositionData<'a>> for ComposingNormalizer<'a>
 }
 
 macro_rules! normalization_method {
-    ($method: ident, $bound: expr, $bound_first_byte: expr) => {
+    ($method: ident, $bound_first_byte: expr) => {
         #[inline(always)]
         pub fn $method(&self, input: &str) -> String
         {
@@ -78,7 +78,7 @@ macro_rules! normalization_method {
                 let (data_value, code) = loop {
                     // всё прочитали - комбинируем предшествующий текущему отрезку буфер, дописываем остаток
                     if iter.is_empty() {
-                        combine_and_write(&mut buffer, &mut result, combining, &self.compositions);
+                        combine!();
                         write_str!(result, iter.ending_slice());
 
                         return result;
@@ -215,17 +215,20 @@ impl<'a> ComposingNormalizer<'a>
     }
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
-    #[inline(never)]
+    #[inline(always)]
     pub fn normalize(&self, input: &str) -> String
     {
-        match self.get_data_value(0xA0) {
-            0 => self.normalize_nfc(input),
-            _ => self.normalize_nfkc(input),
-        }
+        self.normalize_nfc(input)
+        // match self.get_data_value(0xA0) {
+        //     0 => self.normalize_nfc(input),
+        //     _ => self.normalize_nfkc(input),
+        // }
     }
 
-    normalization_method!(normalize_nfc, 0x0300, 0xCC);
-    normalization_method!(normalize_nfkc, 0x00A0, 0xC2);
+    // 0xCC и 0xC2 - первые байты UTF-8 последовательностей кодпоинтов U+0300 и U+00A0
+
+    normalization_method!(normalize_nfc, 0xCC);
+    normalization_method!(normalize_nfkc, 0xC2);
 
     /// данные о декомпозиции / композиции кодпоинта
     #[inline(always)]
@@ -248,7 +251,7 @@ impl<'a> ComposingNormalizer<'a>
 
     /// записать в буфер декомпозицию (точнее, прекомпозицию) последнего полученного кодпоинта
     /// для комбинирования с нестартером
-    #[inline]
+    #[inline(always)]
     fn buffer_previous(&self, buffer: &mut Vec<Codepoint>, code: u32) -> Combining
     {
         let data_value = self.get_data_value(code);

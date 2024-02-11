@@ -1,69 +1,10 @@
 use std::collections::HashMap;
 
-use unicode_normalization_prepare::encode::*;
 use unicode_normalization_source::{
     properties::Codepoint, COMPOSITION_EXCLUSIONS, COMPOSITION_PAIRS, NFC, NFKC, UNICODE,
 };
 
-/// последний кодпоинт в таблице UNICODE, имеющий декомпозицию
-#[test]
-fn last_decomposing_code()
-{
-    let mut codes: Vec<&u32> = UNICODE.keys().collect();
-    codes.sort();
-
-    let mut last = 0;
-    let mut stats = HashMap::new();
-
-    for code in codes {
-        let codepoint = &UNICODE[code];
-        let encoded = encode_codepoint(codepoint, true, 0, &mut stats);
-
-        if encoded.value != 0 {
-            last = *code;
-        }
-    }
-
-    println!(
-        "последний стартер без декомозиций и комбинирования: {:04X}",
-        last
-    )
-}
-
-/// мини-карта
-#[test]
-fn nfc_start()
-{
-    let mut first_com = 0;
-    let mut first_dec = 0;
-
-    for code in 0u32 ..= 0xFFF {
-        if code % 32 == 0 {
-            print!("\n{:04X} ", (code / 32) * 32);
-        }
-
-        let c = match &UNICODE.get(&code) {
-            Some(codepoint) => {
-                let mut stats = HashMap::new();
-
-                let encoded = encode_codepoint(codepoint, false, 0, &mut stats);
-
-                match (encoded.value as u8 & 0b_1) as u64 {
-                    1 => '+',
-                    0 => '.',
-                    _ => unreachable!()
-                }
-            }
-            None => '.',
-        };
-
-        print!("{} ", c);
-    }
-    println!();
-    println!("первый s: {:04X}", first_com);
-    println!("первый d: {:04X}", first_dec);
-}
-
+/// статистика декомпозиций NFC, s - стартер, n - нестартер
 #[test]
 fn nfc_stats()
 {
@@ -77,6 +18,7 @@ fn nfc_stats()
     }
 }
 
+/// статистика декомпозиций NFKC, s - стартер, n - нестартер
 #[test]
 fn nfkc_stats()
 {

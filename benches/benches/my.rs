@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use unicode_composing_v1::ComposingNormalizer;
+use unicode_composing::ComposingNormalizer;
 
 mod group;
 
@@ -8,7 +8,7 @@ group!(
     nfc,
     test_nfc,
     "nfc",
-    "v1",
+    "my",
     ComposingNormalizer::nfc()
 );
 
@@ -17,7 +17,7 @@ group!(
     nfkc,
     test_nfkc,
     "nfkc",
-    "v1",
+    "my",
     ComposingNormalizer::nfkc()
 );
 
@@ -26,9 +26,10 @@ group!(
     dec,
     test_dec,
     "dec",
-    "v1",
+    "my",
     ComposingNormalizer::nfc()
 );
 
 criterion_group!(benches, nfc, nfkc, dec);
 criterion_main!(benches);
+

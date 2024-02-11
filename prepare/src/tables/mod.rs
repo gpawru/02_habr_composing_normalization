@@ -59,7 +59,6 @@ pub fn prepare(canonical: bool, stats: &mut HashMap<String, usize>)
             let code = code_for!(block, offset);
 
             // если кодпоинт не найден - значит это стартер без декомпозиции
-            // стоит заметить, что если кодпоинт участвует в композиции, то он обязательно содержится в таблице
             let codepoint = match UNICODE.get(&code) {
                 Some(codepoint) => codepoint,
                 None => {

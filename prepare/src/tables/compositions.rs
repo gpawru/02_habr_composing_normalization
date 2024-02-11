@@ -17,8 +17,8 @@ lazy_static! {
 
 /// "запеченные" композиции - массив значений и индексы для кодпоинтов
 ///
-/// формат записи в таблице:
-/// xxxx xxxx  xxxx xxxx    xxyy yyyy  yyyy yyyy    yyyy ____ ____ ____    iiii iiii  iiii iiii
+/// формат записи в таблице (BE):
+/// iiii iiii  iiii iiii    ____ ____  ____ yyyy    yyyy yyyy  yyyy yyxx    xxxx xxxx  xxxx xxxx
 /// где:
 ///     xx.. - второй кодпоинт
 ///     yy.. - результат комбинирования
@@ -115,7 +115,7 @@ pub struct CompositionInfo
 
 impl CompositionInfo
 {
-    /// информация о хранимых композициях в сжатом виде:
+    /// информация о хранимых композициях в сжатом виде (BE):
     ///   [zzzzz] [zzz zzzz zzzz]
     ///    5 бит      11 бит
     ///       \          \---------- индекс в таблице пар

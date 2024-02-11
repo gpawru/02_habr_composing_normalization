@@ -1,5 +1,6 @@
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::Write;
-use std::{collections::HashMap, fs::File};
 
 use crate::tables::{COMPOSITION_TABLE_DATA, CONTINUOUS_BLOCK_END};
 
@@ -28,7 +29,7 @@ pub fn write(canonical: bool, file: &mut File)
             data: &[{}  ],\n  \
             expansions: &[{}  ],\n  \
             compositions: &[{} ],\n  \
-            continuous_block_end: 0x{:04X},\n
+            continuous_block_end: 0x{:04X},\n\
         }}\n",
         format_num_vec(tables.index.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(tables.data.as_slice(), FORMAT_STRING_LENGTH),

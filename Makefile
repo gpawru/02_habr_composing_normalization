@@ -1,6 +1,6 @@
 # бенчмарки
 bench:
-	cd benches && cargo bench opt && cargo bench icu && cargo bench base
+	cd benches && cargo bench >> report.txt && cargo run report.txt && rm report.txt
 
 # тесты
 test:
@@ -8,16 +8,12 @@ test:
 
 # очистка
 clean:
-	cd benches && cargo clean
-	cd prepare && cargo clean
-	cd source && cargo clean
-	cd tests && cargo clean
-	cd decomposing/1_base && cargo clean
-	cd decomposing/2_opt && cargo clean
+	cd benches && cargo clean && rm Cargo.lock
+	cd prepare && cargo clean && rm Cargo.lock
+	cd source && cargo clean && rm Cargo.lock
+	cd tests && cargo clean && rm Cargo.lock
+	cd composing && cargo clean && rm Cargo.lock
 
 # подготовка данных
 bake:
 	cd prepare && cargo run
-
-report:
-	cd _reports && cargo run
