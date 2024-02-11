@@ -46,7 +46,7 @@ impl<'a> From<data::CompositionData<'a>> for ComposingNormalizer<'a>
 
 macro_rules! normalization_method {
     ($method: ident, $bound: expr, $bound_first_byte: expr) => {
-        #[inline(never)]
+        #[inline(always)]
         pub fn $method(&self, input: &str) -> String
         {
             let mut result = String::with_capacity(input.len());
@@ -89,7 +89,7 @@ macro_rules! normalization_method {
                     // текст, состоящий только из ASCII-символов уже NF(KC) нормализован
                     // учитывая то, что для NFC и NFKC символы до U+0300 и U+00A0 соответственно также нормализованы,
                     // используем не 0x80 в качестве границы, а значение первого байта UTF-8 вышеуказанных символов.
-                    if first < $bound_first_byte || first >> 6 == 0b_10 {
+                    if first < $bound_first_byte {
                         continue;
                     }
 
@@ -111,11 +111,11 @@ macro_rules! normalization_method {
                     // декомпозиция / комбинирование
 
                     // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
-                    let width = match code {
-                        0x00 ..= 0x7F => unreachable!(),
-                        0x80 ..= 0x07FF => 2,
-                        0x0800 ..= 0xFFFF => 3,
-                        0x10000 ..= 0x10FFFF => 4,
+                    let width = match first {
+                        0x00 ..= 0xBF => unreachable!(),
+                        0xC0 ..= 0xDF => 2,
+                        0xE0 ..= 0xEF => 3,
+                        0xF0 ..= 0xF7 => 4,
                         _ => unreachable!(),
                     };
 

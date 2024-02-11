@@ -10,8 +10,6 @@ fn icu()
     let icu_nfc = icu::new_nfc();
     let icu_nfkc = icu::new_nfkc();
 
-    icu_nfc.normalize("");
-
     macro_rules! test {
         ($(($n: ident,  $t: expr)),+) => {
             $(

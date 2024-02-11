@@ -12,14 +12,23 @@ group!(
     ComposingNormalizer::nfc()
 );
 
-// group!(
-//     "./../test_data/texts",
-//     nfkc,
-//     test_nfkc,
-//     "nfkc",
-//     "v1",
-//     ComposingNormalizer::nfkc()
-// );
+group!(
+    "./../test_data/texts",
+    nfkc,
+    test_nfkc,
+    "nfkc",
+    "v1",
+    ComposingNormalizer::nfkc()
+);
 
-criterion_group!(benches, nfc /* , nfkc */);
+group!(
+    "./../test_data/texts_decomposed",
+    dec,
+    test_dec,
+    "dec",
+    "v1",
+    ComposingNormalizer::nfc()
+);
+
+criterion_group!(benches, nfc, nfkc, dec);
 criterion_main!(benches);
