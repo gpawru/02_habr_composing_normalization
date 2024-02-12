@@ -144,31 +144,8 @@ macro_rules! normalizer_methods {
 
 impl<'a> ComposingNormalizer<'a>
 {
-    /// NFC-нормализатор
-    pub fn nfc() -> Self
-    {
-        Self::from_baked(data::nfc(), true)
-    }
-
-    /// NFKC-нормализатор
-    pub fn nfkc() -> Self
-    {
-        Self::from_baked(data::nfkc(), false)
-    }
-
-    /// заранее подготовленные данные
-    #[inline(always)]
-    pub fn from_baked(source: data::CompositionData<'a>, is_canonical: bool) -> Self
-    {
-        Self {
-            index: Aligned::from(source.index),
-            data: Aligned::from(source.data),
-            expansions: Aligned::from(source.expansions),
-            compositions: Aligned::from(source.compositions),
-            continuous_block_end: source.continuous_block_end,
-            is_canonical,
-        }
-    }
+    normalizer_methods!(normalize_nfc, always, fast_forward_nfc, 0xCC);
+    normalizer_methods!(normalize_nfkc, always, fast_forward_nfkc, 0xC2);
 
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
@@ -180,9 +157,6 @@ impl<'a> ComposingNormalizer<'a>
             false => self.normalize_nfkc(input),
         }
     }
-
-    normalizer_methods!(normalize_nfc, always, fast_forward_nfc, 0xCC);
-    normalizer_methods!(normalize_nfkc, always, fast_forward_nfkc, 0xC2);
 
     /// NFC или NFKC нормализация?
     #[inline(never)]
@@ -334,6 +308,31 @@ impl<'a> ComposingNormalizer<'a>
                     &self.compositions,
                 );
             }
+        }
+    }
+
+    /// NFC-нормализатор
+    pub fn nfc() -> Self
+    {
+        Self::from_baked(data::nfc(), true)
+    }
+
+    /// NFKC-нормализатор
+    pub fn nfkc() -> Self
+    {
+        Self::from_baked(data::nfkc(), false)
+    }
+
+    /// заранее подготовленные данные
+    pub fn from_baked(source: data::CompositionData<'a>, is_canonical: bool) -> Self
+    {
+        Self {
+            index: Aligned::from(source.index),
+            data: Aligned::from(source.data),
+            expansions: Aligned::from(source.expansions),
+            compositions: Aligned::from(source.compositions),
+            continuous_block_end: source.continuous_block_end,
+            is_canonical,
         }
     }
 }
