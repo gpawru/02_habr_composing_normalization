@@ -1,6 +1,7 @@
 use codepoint::decode::{is_nonstarters_value, parse_data_value, DecodedValue};
 use codepoint::Codepoint;
 use composition::*;
+pub use data::CompositionData;
 use slice::aligned::Aligned;
 use slice::iter::CharsIter;
 
@@ -19,17 +20,17 @@ const LAST_DECOMPOSITION_CODE: u32 = 0x2FA1D;
 pub struct ComposingNormalizer<'a>
 {
     /// индекс блока. u8 достаточно, т.к. в NFC последний блок - 0x40, в NFKC - 0x6F (+1 для пустого блока)
-    pub index: Aligned<'a, u8>,
+    index: Aligned<'a, u8>,
     /// основные данные
-    pub data: Aligned<'a, u64>,
+    data: Aligned<'a, u64>,
     /// данные кодпоинтов, которые не вписываются в основную часть
-    pub expansions: Aligned<'a, u32>,
+    expansions: Aligned<'a, u32>,
     /// композиции
-    pub compositions: Aligned<'a, u64>,
+    compositions: Aligned<'a, u64>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
-    pub continuous_block_end: u32,
+    continuous_block_end: u32,
     /// NFC или NFKC
-    pub is_canonical: bool,
+    is_canonical: bool,
 }
 
 // методы нормализации вынесены в макрос в целях оптимизации
@@ -157,7 +158,7 @@ impl<'a> ComposingNormalizer<'a>
 
     /// заранее подготовленные данные
     #[inline(always)]
-    fn from_baked(source: data::CompositionData<'a>, is_canonical: bool) -> Self
+    pub fn from_baked(source: data::CompositionData<'a>, is_canonical: bool) -> Self
     {
         Self {
             index: Aligned::from(source.index),
