@@ -35,8 +35,8 @@ pub struct ComposingNormalizer<'a>
 
 // методы нормализации вынесены в макрос в целях оптимизации
 macro_rules! normalizer_methods {
-    ($normalize_method: ident, $inline: ident, $fast_forward_method: ident, $fast_forward_first_code_boundary: expr) => {
-        #[inline($inline)]
+    ($normalize_method: ident, $fast_forward_method: ident, $fast_forward_first_code_boundary: expr) => {
+        #[inline(always)]
         fn $normalize_method(&self, input: &str) -> String
         {
             let mut result = String::with_capacity(input.len());
@@ -144,8 +144,8 @@ macro_rules! normalizer_methods {
 
 impl<'a> ComposingNormalizer<'a>
 {
-    normalizer_methods!(normalize_nfc, always, fast_forward_nfc, 0xCC);
-    normalizer_methods!(normalize_nfkc, always, fast_forward_nfkc, 0xC2);
+    normalizer_methods!(normalize_nfc, fast_forward_nfc, 0xCC);
+    normalizer_methods!(normalize_nfkc, fast_forward_nfkc, 0xC2);
 
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
