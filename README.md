@@ -4,12 +4,12 @@
 
 ### структура репозитория:
 
-- [**benches**](benches/README.md) - бенчмарки нормализации
-- [**tests**](tests/README.md) - тесты нормализации
+- [**benches**](benches) - бенчмарки нормализации
+- [**tests**](tests) - тесты нормализации
 - **data** - "запечённые" данные декомпозиции
-- [**composing**](composing/README.md) - нормализация строк
-- [**source**](source/README.md) - данные UCD и их парсинг
-- [**prepare**](prepare/README.md) - экспорт данных в файлы
+- [**composing**](composing) - нормализация строк
+- [**source**](source) - данные UCD и их парсинг
+- [**prepare**](prepare) - экспорт данных в файлы
 - **test_data** - данные для тестирования и бенчмарков
 
 запуск бенчмарков:
