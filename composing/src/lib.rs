@@ -90,7 +90,7 @@ macro_rules! normalizer_methods {
                 // текст, состоящий только из ASCII-символов уже NF(K)C нормализован
                 // учитывая то, что для NFC и NFKC символы до U+0300 и U+00A0 соответственно также нормализованы,
                 // используем не 0x80 в качестве границы, а значение первого байта UTF-8 вышеуказанных символов.
-                if first < 0xCC {
+                if first < $fast_forward_first_code_boundary {
                     continue;
                 }
 
