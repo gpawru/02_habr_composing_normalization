@@ -1,5 +1,5 @@
 use unicode_composing::ComposingNormalizer as my;
-use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
+use unicode_data::{NormalizationTest, NORMALIZATION_TESTS};
 
 macro_rules! test {
     ($left: expr, $right: expr, $normalizer: expr, $test: expr, $str: expr) => {
