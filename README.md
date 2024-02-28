@@ -8,14 +8,20 @@
 - [**tests**](tests) - тесты нормализации
 - **data** - "запечённые" данные декомпозиции
 - [**composing**](composing) - нормализация строк
-- [**source**](source) - данные UCD и их парсинг
-- [**prepare**](prepare) - экспорт данных в файлы
 - **test_data** - данные для тестирования и бенчмарков
 
-запуск бенчмарков:
+### подготовка данных:
+
+- парсинг UCD: https://github.com/gpawru/unicode_data
+- запекание данных: https://github.com/gpawru/unicode_bakery
+
+### запуск тестов и бенчмарков:
+
+```
+make test
+```
 
 ```
 make bench
 ```
 *(результат - в виде CSV)*
-

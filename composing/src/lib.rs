@@ -195,6 +195,7 @@ impl<'a> ComposingNormalizer<'a>
         match parse_data_value(data_value) {
             DecodedValue::Starter(combining) => {
                 buffer.push(Codepoint { code, ccc: 0 });
+
                 combining
             }
             DecodedValue::Pair(starter, nonstarter, combining) => {
@@ -207,10 +208,7 @@ impl<'a> ComposingNormalizer<'a>
                 let index = index as usize;
                 let len = len as usize;
 
-                buffer.push(Codepoint {
-                    ccc: 0,
-                    code: self.expansions[index],
-                });
+                buffer.push(Codepoint::from_compressed(self.expansions[index]));
 
                 self.expansions[index + 1 .. index + len]
                     .iter()
@@ -279,18 +277,20 @@ impl<'a> ComposingNormalizer<'a>
             DecodedValue::Expansion(new_combining, index, ns_len, len) => {
                 let index = index as usize;
                 let st_len = len - ns_len;
+
                 let buffer_from = st_len.saturating_sub(1) as usize;
 
                 let slice = &self.expansions[index .. index + len as usize];
 
                 if st_len != 0 {
                     combine!();
+
                     *combining = new_combining;
 
                     if st_len > 1 {
                         slice[.. buffer_from]
                             .iter()
-                            .for_each(|c| write!(result, *c));
+                            .for_each(|c| write!(result, *c >> 8));
                     }
                 }
 

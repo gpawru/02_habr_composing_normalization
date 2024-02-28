@@ -1,9 +1,0 @@
-[package]
-name = "unicode_normalization_prepare"
-version = "0.1.0"
-edition = "2021"
-publish = false
-
-[dependencies]
-unicode_normalization_source = { path = "./../source" }
-lazy_static = "1.4.0"

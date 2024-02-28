@@ -118,5 +118,5 @@ fn parse_expansion(value: u64) -> DecodedValue
 #[inline(always)]
 fn parse_combines_backwards(value: u64) -> DecodedValue
 {
-    DecodedValue::CombinesBackwards(o!(value, Combining, 1))
+    DecodedValue::CombinesBackwards(o!(value, Combining, 2))
 }

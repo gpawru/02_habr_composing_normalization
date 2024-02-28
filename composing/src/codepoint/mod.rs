@@ -24,8 +24,8 @@ impl Codepoint
     pub fn from_compressed(value: u32) -> Self
     {
         Self {
-            ccc: (value >> 24) as u8,
-            code: value & 0x3FFFF,
+            ccc: value as u8,
+            code: value >> 8,
         }
     }
 }
