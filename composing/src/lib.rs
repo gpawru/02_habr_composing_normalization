@@ -16,17 +16,17 @@ mod utf8;
 const LAST_DECOMPOSITION_CODE: u32 = 0x2FA1D;
 
 /// нормализатор NF(K)C
-#[repr(align(128))]
+#[repr(C, align(32))]
 pub struct ComposingNormalizer<'a>
 {
-    /// индекс блока. u8 достаточно, т.к. в NFC последний блок - 0x40, в NFKC - 0x6F (+1 для пустого блока)
-    index: Aligned<'a, u8>,
     /// основные данные
     data: Aligned<'a, u64>,
-    /// данные кодпоинтов, которые не вписываются в основную часть
-    expansions: Aligned<'a, u32>,
+    /// индекс блока. u8 достаточно, т.к. в NFC последний блок - 0x40, в NFKC - 0x6F (+1 для пустого блока)
+    index: Aligned<'a, u8>,
     /// композиции
     compositions: Aligned<'a, u64>,
+    /// данные кодпоинтов, которые не вписываются в основную часть
+    expansions: Aligned<'a, u32>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
     /// NFC или NFKC
