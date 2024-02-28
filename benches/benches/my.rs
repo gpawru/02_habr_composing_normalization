@@ -9,7 +9,7 @@ group!(
     test_nfc,
     "nfc",
     "my",
-    ComposingNormalizer::nfc()
+    ComposingNormalizer::new_nfc()
 );
 
 group!(
@@ -18,7 +18,7 @@ group!(
     test_nfkc,
     "nfkc",
     "my",
-    ComposingNormalizer::nfkc()
+    ComposingNormalizer::new_nfkc()
 );
 
 group!(
@@ -27,9 +27,8 @@ group!(
     test_dec,
     "dec",
     "my",
-    ComposingNormalizer::nfc()
+    ComposingNormalizer::new_nfc()
 );
 
 criterion_group!(benches, nfc, nfkc, dec);
 criterion_main!(benches);
-

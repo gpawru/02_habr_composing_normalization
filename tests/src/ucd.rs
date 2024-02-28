@@ -38,7 +38,7 @@ fn ucd_test_nfc()
         };
     }
 
-    test_group!(my::nfc());
+    test_group!(my::new_nfc());
 }
 
 /// тесты NFKC нормализации из UCD
@@ -65,5 +65,5 @@ fn ucd_test_nfkc()
         };
     }
 
-    test_group!(my::nfkc());
+    test_group!(my::new_nfkc());
 }

@@ -11,8 +11,8 @@ fn icu()
     macro_rules! test {
         ($(($n: ident,  $t: expr)),+) => {
             $(
-                let nfc = $n::nfc();
-                let nfkc = $n::nfkc();
+                let nfc = $n::new_nfc();
+                let nfkc = $n::new_nfkc();
 
                 for data in crate::data::files() {
                     assert_eq!(

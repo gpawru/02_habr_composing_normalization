@@ -310,13 +310,13 @@ impl<'a> ComposingNormalizer<'a>
     }
 
     /// NFC-нормализатор
-    pub fn nfc() -> Self
+    pub fn new_nfc() -> Self
     {
         Self::from_baked(data::nfc(), true)
     }
 
     /// NFKC-нормализатор
-    pub fn nfkc() -> Self
+    pub fn new_nfkc() -> Self
     {
         Self::from_baked(data::nfkc(), false)
     }
