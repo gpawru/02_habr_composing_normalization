@@ -16,7 +16,7 @@ mod utf8;
 const LAST_DECOMPOSITION_CODE: u32 = 0x2FA1D;
 
 /// нормализатор NF(K)C
-#[repr(C, align(64))]
+#[repr(C, align(32))]
 pub struct ComposingNormalizer<'a>
 {
     /// основные данные

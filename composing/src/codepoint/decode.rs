@@ -99,7 +99,7 @@ fn parse_singleton(value: u64) -> DecodedValue
 #[inline(always)]
 fn parse_nonstarter(value: u64) -> DecodedValue
 {
-    DecodedValue::Nonstarter((value >> 4) as u8)
+    DecodedValue::Nonstarter((value >> 8) as u8)
 }
 
 /// случай, когда последовательность записана в отдельной таблице
