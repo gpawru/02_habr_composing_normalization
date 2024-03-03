@@ -4,7 +4,7 @@ pub struct CompositionData<'a>
     /// индекс блока. u8 достаточно, т.к. в NFC последний блок - 0x40, в NFKC - 0x6F (+1 для пустого блока)
     pub index: &'a [u8],
     /// основные данные
-    pub data: &'a [u64],
+    pub data: &'a [u32],
     /// данные кодпоинтов, которые не вписываются в основную часть
     pub expansions: &'a [u32],
     /// композиции
@@ -16,11 +16,11 @@ pub struct CompositionData<'a>
 /// данные для NFC-нормализации
 pub fn nfc<'a>() -> CompositionData<'a>
 {
-    include!("./../../data/nfc.rs.txt")
+    include!("./../../data/nfc.u32.rs.txt")
 }
 
 /// данные для NFKC-нормализации
 pub fn nfkc<'a>() -> CompositionData<'a>
 {
-    include!("./../../data/nfkc.rs.txt")
+    include!("./../../data/nfkc.u32.rs.txt")
 }

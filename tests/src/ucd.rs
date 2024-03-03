@@ -7,7 +7,7 @@ macro_rules! test {
             $left,
             $normalizer.normalize(&$right),
             stringify!($str),
-            $test.line + 1,
+            $test.line,
             $test.description
         );
     };
@@ -55,11 +55,11 @@ fn ucd_test_nfkc()
             let normalizer = $normalizer;
 
             for t in tests {
-                test!(t.c4, t.c1, normalizer, t, "{} {}: c5 == toNFKD(c1)");
-                test!(t.c4, t.c2, normalizer, t, "{} {}: c5 == toNFKD(c2)");
-                test!(t.c4, t.c3, normalizer, t, "{} {}: c5 == toNFKD(c3)");
-                test!(t.c4, t.c4, normalizer, t, "{} {}: c5 == toNFKD(c4)");
-                test!(t.c4, t.c5, normalizer, t, "{} {}: c5 == toNFKD(c5)");
+                test!(t.c4, t.c1, normalizer, t, "{} {}: c5 == toNFKC(c1)");
+                test!(t.c4, t.c2, normalizer, t, "{} {}: c5 == toNFKC(c2)");
+                test!(t.c4, t.c3, normalizer, t, "{} {}: c5 == toNFKC(c3)");
+                test!(t.c4, t.c4, normalizer, t, "{} {}: c5 == toNFKC(c4)");
+                test!(t.c4, t.c5, normalizer, t, "{} {}: c5 == toNFKC(c5)");
             }
         )+
         };

@@ -1,5 +1,18 @@
 use crate::slice::iter::CharsIter;
 
+/// получаем количество байт в последовательности UTF-8
+#[inline(always)]
+pub fn get_utf8_sequence_width(first: u8) -> u8
+{
+    match first {
+        0 ..= 0x7F => 1,
+        0xC2 ..= 0xDF => 2,
+        0xE0 ..= 0xEF => 3,
+        0xF0 ..= 0xF4 => 4,
+        _ => 0,
+    }
+}
+
 /// читаем первый байт UTF-8 последовательности без проверок
 #[inline(always)]
 pub unsafe fn char_first_byte_unchecked(iter: &mut CharsIter) -> u8

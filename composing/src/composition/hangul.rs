@@ -1,4 +1,4 @@
-use crate::write;
+use crate::write_char;
 
 // в блоке чамо (U+1100..U+11FF) могут быть скомбинированы кодпоинты:
 //  - U+1100..=U+1112 (L, ведущие согласные)
@@ -44,7 +44,7 @@ pub fn combine_and_write_hangul_vt(result: &mut String, jamo: u32)
     let code = match result.pop() {
         Some(code) => u32::from(code),
         None => {
-            write!(result, jamo);
+            write_char(result, jamo);
             return;
         }
     };
@@ -56,11 +56,11 @@ pub fn combine_and_write_hangul_vt(result: &mut String, jamo: u32)
             match l < HANGUL_L_COUNT {
                 true => {
                     let lv = HANGUL_S_BASE + l * HANGUL_N_COUNT + v * HANGUL_T_BLOCK_SIZE;
-                    write!(result, lv);
+                    write_char(result, lv);
                 }
                 false => {
-                    write!(result, code);
-                    write!(result, HANGUL_V_BASE + v);
+                    write_char(result, code);
+                    write_char(result, HANGUL_V_BASE + v);
                 }
             }
         }
@@ -69,11 +69,11 @@ pub fn combine_and_write_hangul_vt(result: &mut String, jamo: u32)
 
             match lv < HANGUL_S_COUNT && lv % HANGUL_T_BLOCK_SIZE == 0 {
                 true => {
-                    write!(result, code + t + 1);
+                    write_char(result, code + t + 1);
                 }
                 false => {
-                    write!(result, code);
-                    write!(result, HANGUL_T_BASE + t);
+                    write_char(result, code);
+                    write_char(result, HANGUL_T_BASE + t);
                 }
             }
         }
