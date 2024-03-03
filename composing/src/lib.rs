@@ -275,7 +275,7 @@ impl<'a> ComposingNormalizer<'a>
 
     /// кодпоинт участвует в декомпозиции - комбинируем текущий буфер (кроме случая с нестартером),
     /// пишем в буфер декомпозицию кодпоинта или комбинируем сразу (хангыль, комбинирование с предыдущим)
-    #[inline(always)]
+    #[inline(never)]
     fn handle_dec_value(
         &self,
         dec_value: u32,
@@ -296,6 +296,7 @@ impl<'a> ComposingNormalizer<'a>
 
                 // в этот блок попадают только стартеры - чамо хангыль
                 combine_and_write_hangul_vt(result, code);
+                
                 *combining = Combining::None;
             }
             MARKER_SINGLETON => {
