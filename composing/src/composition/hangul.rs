@@ -1,5 +1,7 @@
 use crate::write_char;
 
+use super::Combining;
+
 // в блоке чамо (U+1100..U+11FF) могут быть скомбинированы кодпоинты:
 //  - U+1100..=U+1112 (L, ведущие согласные)
 //  - U+1161..=U+1176 (V, гласные)
@@ -38,18 +40,29 @@ pub enum HangulVT
 }
 
 /// скомбинировать чамо хангыль (V / T) с предыдущим кодпоинтом
-#[inline(always)]
-pub fn combine_and_write_hangul_vt(result: &mut String, jamo: u32)
+#[inline(never)]
+pub fn combine_and_write_hangul_vt(
+    result: &mut String,
+    jamo: u32,
+    combining: &mut Combining,
+) -> bool
 {
+    let vt = match get_vt(jamo) {
+        Some(vt) => vt,
+        None => return false,
+    };
+
+    *combining = Combining::None;
+
     let code = match result.pop() {
         Some(code) => u32::from(code),
         None => {
             write_char(result, jamo);
-            return;
+            return true;
         }
     };
 
-    match get_vt(jamo) {
+    match vt {
         HangulVT::Vowel(v) => {
             let l = code.wrapping_sub(HANGUL_L_BASE);
 
@@ -78,19 +91,25 @@ pub fn combine_and_write_hangul_vt(result: &mut String, jamo: u32)
             }
         }
     }
+
+    true
 }
 
-/// мы знаем, что кодпоинт является гласной или завершающей согласной чамо хангыль, получаем значения
+/// если кодпоинт является гласной или завершающей согласной чамо хангыль - получаем значения
 #[inline(always)]
-fn get_vt(code: u32) -> HangulVT
+fn get_vt(code: u32) -> Option<HangulVT>
 {
     let v = code.wrapping_sub(HANGUL_V_BASE);
 
     match v < HANGUL_V_COUNT {
-        true => HangulVT::Vowel(v),
+        true => Some(HangulVT::Vowel(v)),
         false => {
             let t = v.wrapping_sub(HANGUL_T_BASE - HANGUL_V_BASE);
-            HangulVT::TrailingConsonant(t)
+
+            match t < HANGUL_T_COUNT {
+                true => Some(HangulVT::TrailingConsonant(t)),
+                false => None,
+            }
         }
     }
 }
