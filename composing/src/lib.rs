@@ -220,7 +220,7 @@ impl<'a> ComposingNormalizer<'a>
     fn get_decomposition_value(&self, code: u32) -> u32
     {
         let data_block_base = match code <= self.continuous_block_end {
-            true => 0x600 | (((code >> 3) as u16) & !0x7),
+            true => 0x600 | (((code >> 3) as u16) & !0xF),
             false => {
                 let group_index = (code >> 7) as u16;
 
