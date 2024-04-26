@@ -11,7 +11,6 @@ mod codepoint;
 mod composition;
 mod data;
 mod slice;
-mod utf8;
 
 /// последний кодпоинт с декомпозицией (U+2FA1D), его блок - 0x5F4
 pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = (0x2FA1D >> (18 - 11)) as u16;
@@ -104,10 +103,10 @@ macro_rules! normalizer_methods {
             iter.set_breakpoint();
 
             if !iter.is_empty() {
-                let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+                let first = unsafe { iter.next_unchecked() };
 
                 if first >= $first_code_boundary {
-                    let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+                    let code = unsafe { iter.next_nonascii_bytes_unchecked(first) };
                     let dec_value = self.get_decomposition_value(code);
 
                     if dec_value & 1 != 0 {
@@ -137,7 +136,7 @@ macro_rules! normalizer_methods {
                     return None;
                 }
 
-                let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+                let first = unsafe { iter.next_unchecked() };
 
                 // текст, состоящий только из ASCII-символов уже NF(K)C нормализован
                 // учитывая то, что для NFC и NFKC символы до U+0300 и U+00A0 соответственно также нормализованы,
@@ -146,7 +145,7 @@ macro_rules! normalizer_methods {
                     continue;
                 }
 
-                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+                let code = unsafe { iter.next_nonascii_bytes_unchecked(first) };
                 let dec_value = self.get_decomposition_value(code);
 
                 // является ли кодпоинт нормализованым? если - "да" или "возможно" (он считается
@@ -158,12 +157,13 @@ macro_rules! normalizer_methods {
                 // выходим из быстрого цикла, т.к. мы столкнулись с ситуацией, когда требуется
                 // декомпозиция / комбинирование
 
-                let width = utf8::get_utf8_sequence_width(first) as isize;
+                // не учитываем однобайтовый вариант, учитываем, что последовательность валидна
+                let width: u8 = [2, 2, 3, 4][((first >> 4) & 3) as usize];
 
                 // если у нас есть последовательность кодпоинтов в быстром цикле - комбинируем предшествующие
                 // ему кодпоинты буфера, дописываем полученное в результат
-                if !iter.at_breakpoint(width) {
-                    write_str(result, iter.block_slice(width));
+                if !iter.at_breakpoint(width as isize) {
+                    write_str(result, iter.block_slice(width as isize));
 
                     // на данный момент мы уже пропустили какой-то кодпоинт (qc = 0) в быстром цикле,
                     // он (предыдущий кодпоинт) может быть только:
